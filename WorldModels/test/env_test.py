@@ -31,7 +31,7 @@ from utils import PARSER
 
 # Get the commandline arguments for this file exectuion
 args = PARSER.parse_args()
-print("Environment Name: {}".format(args.env_name))
+print("[INFO] Environment Name: {}".format(args.env_name))
 
 
 env = make_env(args=args, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  ## Model not loaded because it's not trained yet

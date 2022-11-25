@@ -26,7 +26,7 @@ from utils import PARSER
 
 # Get the commandline arguments for this file exectuion
 args = PARSER.parse_args()
-print("Environment Name: {}".format(args.env_name))
+print("[INFO] Environment Name: {}".format(args.env_name))
 
 # Create log directory
 dir_name = 'results/{}/{}/record'.format(args.exp_name, args.env_name)
@@ -91,7 +91,7 @@ for trial in range(args.max_trials):
             # print("[DEBUGGING] recording_done: {}".format(recording_done))
 
             if done:
-                print('total reward {}'.format(totalReward))
+                print('[INFO] total reward {}'.format(totalReward))
                 break
         recording_agent = np.array(recording_agent, dtype=str) 
         recording_obs = np.array(recording_obs, dtype=np.float16)

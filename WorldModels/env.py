@@ -11,8 +11,6 @@ from gym.envs.box2d.car_racing import CarRacing
 
 from pettingzoo.sisl import multiwalker_v9
 
-print("[DEBUGGING] top of env.py")
-
 class MultiWalkerWrapper(gym.Wrapper):
     print("[DEBUGGING] Instantiating multiwalkerwrapper")
     def __init__(self, env, full_episode=False):
@@ -20,51 +18,22 @@ class MultiWalkerWrapper(gym.Wrapper):
       super(MultiWalkerWrapper, self).__init__(env)
       self.env = env
 
-    def _step(self, action):    
+    def _step(self, action):
+      # Applies the action for the walker/agent that is currently selected    
       self.env.step(action)
-      # Get observation, cumulative reward, terminated, truncated, info for the current agent (specified by agent_selection)
+      # Get observation, cumulative reward, terminated, truncated, info for the current walker/agent (specified by agent_selection)
       observation, reward, terminated, truncation, info = self.env.last()
       if self.full_episode:
         return observation, reward, False, {}
       return observation, reward, terminated, {}
-
-# # class MultiWalkerWrapper(multiwalker_v9.raw_env()):
-# #     print("[DEBUGGING] Instantiating multiwalkerwrapper")
-# #     def __init__(self, full_episode=False):
-# #       print("[DEBUGGING] initializing MultiWalkerWrapper")
-# #       # TODO: make initialization configurable
-# #       super(MultiWalkerWrapper, self).__init__(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
-# # terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=50, render_mode="human")
-# #       print("[DEBUGGING] MultiWalkerWrapper initialized!")
-# #       self.full_episode = full_episode
-# #       ## This should probably NOT be defined for Multiwalker, can just use the problems normal definition
-# #       # self.observation_space = Box(low=0, high=255, shape=(64, 64, 3)) # , dtype=np.uint8
-
-# #     # ## Not needed for multiwalker?
-# #     # def _process_frame(self, frame):
-# #     #   obs = frame[0:84, :, :]
-# #     #   obs = Image.fromarray(obs, mode='RGB').resize((64, 64))
-# #     #   obs = np.array(obs)
-# #     #   return obs
-
-# #     # The agent that is performing the action is specified by env.agent_selection
-# #     def _step(self, action):    
-# #       super(MultiWalkerWrapper, self).step(action)
-# #       # Get observation, cumulative reward, terminated, truncated, info for the current agent (specified by agent_selection)
-# #       observation, reward, terminated, truncation, info = super(MultiWalkerWrapper, self).last()
-# #       if self.full_episode:
-# #         return observation, reward, False, {}
-# #       return observation, reward, terminated, {}
 
 
 class CarRacingWrapper(CarRacing):
   def __init__(self, full_episode=False):
     super(CarRacingWrapper, self).__init__()
     self.full_episode = full_episode
-    ## This should probably NOT be defined for Multiwalker, can just use the problems normal definition
     self.observation_space = Box(low=0, high=255, shape=(64, 64, 3)) # , dtype=np.uint8
 
-  ## Not needed for multiwalker?
   def _process_frame(self, frame):
     obs = frame[0:84, :, :]
     obs = Image.fromarray(obs, mode='RGB').resize((64, 64))
@@ -83,7 +52,7 @@ from rnn.rnn import MDNRNN, rnn_next_state, rnn_init_state
 
 class MultiwalkerMDNRNN(MultiWalkerWrapper):
   print("[DEBUGGING] initializing MultiwalkerMDNRNN")
-  def __init__(self, args, env, load_model=True, full_episode=False):
+  def __init__(self, args, env, load_model=False, full_episode=False):
     super(MultiwalkerMDNRNN, self).__init__(env, full_episode=full_episode)
     # self.vae = CVAE(args) # No VAE
     print("[DEBUGGING] Defining RNN...")
@@ -96,16 +65,7 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 
-    # self.observation_space = Box(low=np.NINF, high=np.Inf, shape=(32+256)) # Should just be using normal obs space for multiwalker
 
-  # No VAE
-  # def encode_obs(self, obs):
-  #   # convert raw obs to z, mu, logvar
-  #   ## Because the multiwalker will not use the VAE, we can just set z = obs.astype(np.float)
-  #   result = np.copy(obs).astype(np.float)/255.0
-  #   result = result.reshape(1, 64, 64, 3)
-  #   z = self.vae.encode(result)[0]
-  #   return z
     print("[DEBUGGING] MultiWalkerWrapper initialized!")
 
   def reset(self):
@@ -376,7 +336,7 @@ def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=Fal
     print('making multiwalker environment')
     # TODO: make init configurable
     env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
-terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=50, render_mode="human")
+terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames)
     env = MultiwalkerMDNRNN(args=args, env=env, full_episode=full_episode, load_model=load_model)
   else:
     if dream_env:

@@ -17,7 +17,7 @@ import time
 from pettingzoo.sisl import multiwalker_v9
 from pettingzoo.utils import random_demo
 
-print("Type of MultiWalkerEnv: {}".format(type(multiwalker_v9.raw_env())))
+print("[INFO] Type of MultiWalkerEnv: {}".format(type(multiwalker_v9.raw_env())))
 
 # Instantiate environment
 env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
@@ -39,7 +39,7 @@ try:
 
             for agent in env.agent_iter():
                 print("======================================================")
-                print("agent: {}".format(agent))
+                print("[INFO] agent: {}".format(agent))
                 env.render()
                 # env.render(
                 #     mode="rgb_array",
@@ -55,7 +55,7 @@ try:
                 # print("======================================================")
 
                 action = None if terminated or truncation else env.action_space(agent).sample()  # random policy
-                print("action: {}".format(action))
+                print("[INFO] action: {}".format(action))
                 env.step(action)
                 time.sleep(0.01) # to allow rendering at a normal speed
 

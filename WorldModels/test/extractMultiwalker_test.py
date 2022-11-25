@@ -23,7 +23,7 @@ try:
     script_dir = os.path.dirname(__file__)
     # append the relative location you want to import from
     dirname = os.path.join(script_dir,"../results/WorldModels/multiwalker_v9/record")
-    print("DIR NAME: {}".format(dirname))
+    print("[INFO] DIR NAME: {}".format(dirname))
     # Get list of filenames
     filenames = os.listdir(dirname)
     # Loop thru all file names
