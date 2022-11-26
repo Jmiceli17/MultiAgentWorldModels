@@ -55,6 +55,8 @@ try:
                 # print("======================================================")
 
                 action = None if terminated or truncation else env.action_space(agent).sample()  # random policy
+                # action = None # Doesn't work
+                # action = env.action_space(agent).sample() # Doesn't work
                 print("[INFO] action: {}".format(action))
                 env.step(action)
                 time.sleep(0.01) # to allow rendering at a normal speed

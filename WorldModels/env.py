@@ -18,6 +18,10 @@ class MultiWalkerWrapper(gym.Wrapper):
       super(MultiWalkerWrapper, self).__init__(env)
       self.env = env
 
+    def _last(self):
+      observation, reward, terminated, truncation, info = self.env.last()
+      return observation, reward, terminated, truncation, info
+    
     def _step(self, action):
       # Applies the action for the walker/agent that is currently selected    
       self.env.step(action)
@@ -27,6 +31,9 @@ class MultiWalkerWrapper(gym.Wrapper):
         return observation, reward, False, {}
       return observation, reward, terminated, {}
 
+    def _reset(self):
+      print("[DEBUGGING] Env reset called")
+      self.env.reset()
 
 class CarRacingWrapper(CarRacing):
   def __init__(self, full_episode=False):
@@ -60,7 +67,7 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
     print("[DEBUGGING] RNN defined!")
     if load_model:
       # self.vae.set_weights(tf.keras.models.load_model('results/{}/{}/tf_vae'.format(args.exp_name, args.env_name), compile=False).get_weights()) # No VAE
-      self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights())
+      self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights()) # TODO: Make path to model configurable
 
     self.rnn_states = rnn_init_state(self.rnn)
     
@@ -70,8 +77,15 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
 
   def reset(self):
     self.rnn_states = rnn_init_state(self.rnn)
-    # TODO: do we need to call super(...).last() in order to populate z_h with an observation?
-    z_h = super(MultiwalkerMDNRNN, self).reset(return_info=True) # calls step, this just returns None
+    # super(MultiwalkerMDNRNN, self).reset(return_info=True) # calls step, this just returns None
+    super(MultiwalkerMDNRNN, self)._reset()
+
+    # TODO: observations are only updated at the end of a cycle so we may need to change the update of the RNN until all the agents have 
+    # been called
+    observation, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self)._last()
+    z = observation # For multiwalker, z is just the pure observation
+    h = tf.squeeze(self.rnn_states[0])
+    z_h = tf.concat([z, h], axis=-1)
     return z_h
 
   def _step(self, action):
@@ -82,7 +96,7 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
     h = tf.squeeze(self.rnn_states[0])
     z_h = tf.concat([z, h], axis=-1)
 
-    # TODO: how do we handle multiple agents here?
+    # TODO: how do we handle multiple agents here? For each agent, there should be a separate input
     if action is not None: # don't compute state on reset
         self.rnn_states = rnn_next_state(self.rnn, z, action, self.rnn_states)
     
@@ -335,8 +349,8 @@ def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=Fal
   elif args.env_name == 'multiwalker_v9':
     print('making multiwalker environment')
     # TODO: make init configurable
-    env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
-terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames)
+    env = multiwalker_v9.raw_env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
+terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames) # Could also call .env() here
     env = MultiwalkerMDNRNN(args=args, env=env, full_episode=full_episode, load_model=load_model)
   else:
     if dream_env:
