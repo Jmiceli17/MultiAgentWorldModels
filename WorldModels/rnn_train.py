@@ -10,6 +10,9 @@ import tensorflow as tf
 import random
 import time
 
+num_eps = 10000
+save_eps = 1000
+
 from rnn.rnn import MDNRNN, sample_vae
 from utils import PARSER
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -42,8 +45,8 @@ if not os.path.exists(initial_z_save_path):
 initial_mu = []
 initial_logvar = []
 for i in range(1000):
-  mu = np.copy(data_mu[i][0, :]*10000).astype(np.int).tolist()
-  logvar = np.copy(data_logvar[i][0, :]*10000).astype(np.int).tolist()
+  mu = np.copy(data_mu[i][0, :]*num_eps).astype(np.int).tolist()
+  logvar = np.copy(data_logvar[i][0, :]*num_eps).astype(np.int).tolist()
   initial_mu.append(mu)
   initial_logvar.append(logvar)
 with open(os.path.join(initial_z_save_path, "initial_z.json"), 'wt') as outfile:
@@ -66,36 +69,36 @@ rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the mode
 start = time.time()
 step = 0              ## Number of steps to take in the envi
 for step in range(args.rnn_num_steps):
-    curr_learning_rate = (args.rnn_learning_rate-args.rnn_min_learning_rate) * (args.rnn_decay_rate) ** step + args.rnn_min_learning_rate
-    rnn.optimizer.learning_rate = curr_learning_rate
-    
-    raw_z, raw_a, raw_d = random_batch()
+  curr_learning_rate = (args.rnn_learning_rate-args.rnn_min_learning_rate) * (args.rnn_decay_rate) ** step + args.rnn_min_learning_rate
+  rnn.optimizer.learning_rate = curr_learning_rate
+  
+  raw_z, raw_a, raw_d = random_batch()
 
-    inputs = tf.concat([raw_z, raw_a], axis=2)
+  inputs = tf.concat([raw_z, raw_a], axis=2)
 
-    dummy_zero = tf.zeros([raw_z.shape[0], 1, raw_z.shape[2]], dtype=tf.float16)
-    z_targ = tf.concat([raw_z[:, 1:, :], dummy_zero], axis=1) # zero pad the end but we don't actually use it
-    z_mask = 1.0 - raw_d
-    z_targ = tf.concat([z_targ, z_mask], axis=2) # use a signal to not pass grad
+  dummy_zero = tf.zeros([raw_z.shape[0], 1, raw_z.shape[2]], dtype=tf.float16)
+  z_targ = tf.concat([raw_z[:, 1:, :], dummy_zero], axis=1) # zero pad the end but we don't actually use it
+  z_mask = 1.0 - raw_d
+  z_targ = tf.concat([z_targ, z_mask], axis=2) # use a signal to not pass grad
 
-    if args.env_name == 'CarRacing-v0':
-      outputs = z_targ
-    else:
-      d_mask = tf.concat([tf.ones([args.rnn_batch_size, 1, 1], dtype=tf.float16), 1.0 - raw_d[:, :-1, :]], axis=1)
-      d_targ = tf.concat([raw_d, d_mask], axis=2)
-      outputs = [z_targ, d_targ]
+  if args.env_name == 'CarRacing-v0':
+    outputs = z_targ
+  else:
+    d_mask = tf.concat([tf.ones([args.rnn_batch_size, 1, 1], dtype=tf.float16), 1.0 - raw_d[:, :-1, :]], axis=1)
+    d_targ = tf.concat([raw_d, d_mask], axis=2)
+    outputs = [z_targ, d_targ]
 
-    loss = rnn.train_on_batch(x=inputs, y=outputs)
+  loss = rnn.train_on_batch(x=inputs, y=outputs)
 
-    ## Every 20 steps
-    if (step%20==0 and step > 0):
-        end = time.time()
-        time_taken = end-start
-        start = time.time()
-        if args.env_name == 'CarRacing-v0':
-          output_log = "step: %d, lr: %.6f, loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss, time_taken)
-        else:
-          output_log = "step: %d, lr: %.6f, loss: %.4f, z_loss: %.4f, d_loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss[0], loss[1], loss[2], time_taken)
-        print(output_log)
+  ## Every 20 steps
+  if (step%20==0 and step > 0):
+      end = time.time()
+      time_taken = end-start
+      start = time.time()
+      if args.env_name == 'CarRacing-v0':
+        output_log = "step: %d, lr: %.6f, loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss, time_taken)
+      else:
+        output_log = "step: %d, lr: %.6f, loss: %.4f, z_loss: %.4f, d_loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss[0], loss[1], loss[2], time_taken)
+      print(output_log)
 
-        tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
+      tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')

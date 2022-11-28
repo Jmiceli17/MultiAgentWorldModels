@@ -13,7 +13,7 @@ Description:
     see https://numpy.org/doc/stable/reference/generated/numpy.savez.html 
 
     use the following:
-    python extractMultiwalker.py -c /configs/multiwalker.config
+    python extractMultiwalker.py -c ./configs/multiwalker.config
 """
 
 import numpy as np
@@ -39,6 +39,8 @@ if not os.path.exists(dir_name):
 env = make_env(args=args, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  
 
 for trial in range(args.max_trials):
+    if (trial % 10) == 0:
+        print(trial)
     try:
         random_generated_int = random.randint(0, 2**31-1)
         filename = dir_name+"/"+str(random_generated_int)+".npz"
@@ -55,7 +57,7 @@ for trial in range(args.max_trials):
 
         previousReward = 0.0
 
-        # for i in range(args.max_cycles):
+        # for i in range(args.max_frames):
         for i in range(50):
 
             # There's multiple agents in this environment so each of them must apply an action
@@ -97,7 +99,7 @@ for trial in range(args.max_trials):
         recording_obs = np.array(recording_obs, dtype=np.float16)
         recording_action = np.array(recording_action, dtype=np.float16)
         recording_reward = np.array(recording_reward, dtype=np.float16)
-        recording_done = np.array(recording_done, dtype=np.bool)
+        recording_done = np.array(recording_done, dtype=np.bool_)
 
         # save the arrays in a compressed file, arrays are accessbile via keyword arguments
         # TODO: change filename to be more descriptive

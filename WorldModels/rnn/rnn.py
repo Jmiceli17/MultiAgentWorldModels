@@ -105,11 +105,13 @@ class MDNRNN(tf.keras.Model):
 
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
         out = self.out_net(rnn_out)
-        if self.args.env_name == 'CarRacing-v0':
-          return out
-        else: 
+
+        if self.args.env_name == 'DoomTakeCover-v0':
           mdnrnn_params, done_logits = out[:, :-1], out[:, -1:]
           return mdnrnn_params, done_logits
+        else: 
+          return out
+          
 
 @tf.function
 def rnn_next_state(rnn, z, a, prev_state):
@@ -125,11 +127,11 @@ def rnn_init_state(rnn):
 
 def rnn_output(state, z, mode):
   state_h, state_c = state[0], state[1]
-  if mode == MODE_ZCH:
+  if mode == MODE_ZCH: #0
     return np.concatenate([z, np.concatenate((state_c,state_h), axis=1)[0]])
-  if mode == MODE_ZC:
+  if mode == MODE_ZC: #1
     return np.concatenate([z, state_c[0]])
-  if mode == MODE_ZH:
+  if mode == MODE_ZH: #4
     return np.concatenate([z, state_h[0]])
   return z # MODE_Z or MODE_Z_HIDDEN
 
@@ -137,6 +139,8 @@ def rnn_output(state, z, mode):
 def rnn_sim(rnn, z, states, a):
   if rnn.args.env_name == 'CarRacing-v0':
     raise ValueError('Not implemented yet for CarRacing')
+  elif rnn.args.env_name == 'multiwalker_v9':
+    raise ValueError('Not implemented yet for MultiWalker')
   z = tf.reshape(tf.cast(z, dtype=tf.float32), (1, 1, rnn.args.z_size))
   a = tf.reshape(tf.cast(a, dtype=tf.float32), (1, 1, rnn.args.a_width))
   input_x = tf.concat((z, a), axis=2)

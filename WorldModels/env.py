@@ -122,7 +122,7 @@ class CarRacingMDNRNN(CarRacingWrapper):
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 
-    self.observation_space = Box(low=np.NINF, high=np.Inf, shape=(32+256))
+    self.observation_space = Box(low=np.NINF, high=np.Inf, shape=(32+256,))
 
   def encode_obs(self, obs):
     # convert raw obs to z, mu, logvar
@@ -135,7 +135,7 @@ class CarRacingMDNRNN(CarRacingWrapper):
   def reset(self):
     self.rnn_states = rnn_init_state(self.rnn)
     if self.with_obs:
-        [z_h, obs] = super(CarRacingMDNRNN, self).reset() # calls step
+        [z_h, obs] = super(CarRacingMDNRNN, self).reset() # calls step in CarRacing-v0 gym env
         return [z_h, obs]
     else:
         z_h = super(CarRacingMDNRNN, self).reset() # calls step
@@ -159,7 +159,9 @@ class CarRacingMDNRNN(CarRacingWrapper):
     tf.keras.backend.clear_session()
     gc.collect()
 
+
 """
+
 from ppaquette_gym_doom.doom_take_cover import DoomTakeCoverEnv
 from gym.utils import seeding
 class DoomTakeCoverMDNRNN(DoomTakeCoverEnv):
@@ -336,7 +338,7 @@ class DreamDoomTakeCoverMDNRNN:
 
   def render(self, mode):
     pass
-"""
+# """
 
 def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=False, with_obs=False, load_model=True):
   if args.env_name == 'DoomTakeCover-v0':
@@ -346,12 +348,14 @@ def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=Fal
     else:
       print('making real doom environment')
       # env = DoomTakeCoverMDNRNN(args=args, render_mode=render_mode, load_model=load_model, with_obs=with_obs)
+  
   elif args.env_name == 'multiwalker_v9':
     print('making multiwalker environment')
     # TODO: make init configurable
-    env = multiwalker_v9.raw_env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
+    env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
 terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames) # Could also call .env() here
     env = MultiwalkerMDNRNN(args=args, env=env, full_episode=full_episode, load_model=load_model)
+  
   else:
     if dream_env:
       raise ValueError('training in dreams for carracing is not yet supported')

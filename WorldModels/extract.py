@@ -22,7 +22,7 @@ controller = make_controller(args=args)
 
 total_frames = 0
 env = make_env(args=args, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  ## Model not loaded because it's not trained yet
-
+print(env)
 
 for trial in range(args.max_trials):
   try:
@@ -34,7 +34,7 @@ for trial in range(args.max_trials):
     recording_done = []
 
     np.random.seed(random_generated_int)
-    env.seed(random_generated_int)
+    # env.seed(random_generated_int) #seems only for doom
 
     # random policy
     if args.env_name == 'CarRacing-v0':
@@ -44,12 +44,13 @@ for trial in range(args.max_trials):
 
     tot_r = 0
     [obs, frame] = env.reset() # pixels
-
+    
     for i in range(args.max_frames):
-      if args.render_mode:
-        env.render("human")
-      else:
-        env.render("rgb_array")
+      # # seems for doom only
+      # if args.render_mode:
+      #   env.render("human")
+      # else:
+      #   env.render("rgb_array")
 
       recording_frame.append(frame)
       
@@ -82,6 +83,7 @@ for trial in range(args.max_trials):
     
     if (len(recording_frame) > args.min_frames):
       np.savez_compressed(filename, obs=recording_frame, action=recording_action, reward=recording_reward, done=recording_done)   ## This is where the rollout is stored for ingestion by the VAE
+  
   except gym.error.Error:
     print("stupid gym error, life goes on")
     env.close()
