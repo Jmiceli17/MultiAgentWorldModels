@@ -35,7 +35,7 @@ def ds_gen():
           action = np.reshape(data['action'], newshape=[-1, args.a_width])
           reward = data['reward']
           done = data['done']
-          # if done.shape[0] > 1000:
+          # if done.shape[0] > 1000: % TODO: Shouldn't this be always false
           #   print(fname, z.shape,action.shape, reward.shape, done.shape)
           #   print(z[done.shape[0]-10:done.shape[0]+1,0],done[done.shape[0]-10:done.shape[0]+1])
           n_pad = args.max_frames - z.shape[0] # pad so they are all a thousand step long episodes
