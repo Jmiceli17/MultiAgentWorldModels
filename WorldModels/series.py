@@ -34,7 +34,9 @@ def ds_gen():
         action = np.reshape(data['action'], newshape=[-1, args.a_width])
         reward = data['reward']
         done = data['done']
-        # if done.shape[0] > 1000: % TODO: Shouldn't this be always false
+        if done.shape[0] > 1000: #TODO: Shouldn't this be always false
+            print("Skipped a file.")
+            continue
         #   print(fname, z.shape,action.shape, reward.shape, done.shape)
         #   print(z[done.shape[0]-10:done.shape[0]+1,0],done[done.shape[0]-10:done.shape[0]+1])
         n_pad = args.max_frames - z.shape[0] # pad so they are all a thousand step long episodes
@@ -101,7 +103,7 @@ for batch in dataset:
   logvar_dataset.append(logvar.numpy().astype(np.float16))
   action_dataset.append(action_batch.numpy())
   r_dataset.append(r.numpy().astype(np.float16))
-  d_dataset.append(d.numpy().astype(np.bool))
+  d_dataset.append(d.numpy().astype(np.bool_))
 
   if ((i+1) % 100 == 0):
     print(i+1)

@@ -32,7 +32,7 @@ class MultiWalkerWrapper(gym.Wrapper):
       return observation, reward, terminated, {}
 
     def _reset(self):
-      print("[DEBUGGING] Env reset called")
+      # print("[DEBUGGING] Env reset called")
       self.env.reset()
 
 class CarRacingWrapper(CarRacing):
