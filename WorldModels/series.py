@@ -14,7 +14,7 @@ args = PARSER.parse_args()
 DATA_DIR = "results/{}/{}/record".format(args.exp_name, args.env_name)
 SERIES_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)    ## This is the data that is used to train the RNN, in the original paper, it containes data processed by the VAE
 # model_path_name = "results/{}/{}/tf_vae".format(args.exp_name, args.env_name)
-num_eps = 1500#10000
+num_eps = 10000#1500#
 
 if not os.path.exists(SERIES_DIR):
     os.makedirs(SERIES_DIR)
