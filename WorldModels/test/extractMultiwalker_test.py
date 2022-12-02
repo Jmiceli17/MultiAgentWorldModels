@@ -3,7 +3,7 @@ extractMultiwalker_test.py
 
 Author:
     Joe Miceli
-    Mohammed Adib
+    Mohammed Adib Oumer
 
 Description:
 

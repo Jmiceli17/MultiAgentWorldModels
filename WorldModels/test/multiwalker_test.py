@@ -3,7 +3,7 @@ multiwalker_test.py
 
 Author:
     Joe Miceli
-    Mohammed Adib
+    Mohammed Adib Oumer
 
 Description:
     Script to test installation of multiwalker environment
@@ -47,12 +47,12 @@ try:
                 #     height=256,
                 # )        
                 observation, reward, terminated, truncation, info = env.last()
-                # print("======================================================")
-                # print("observation: {}".format(observation))
-                # print("reward: {}".format(reward))
+                print("======================================================")
+                print("observation: {}".format(observation))
+                print("reward: {}".format(reward))
                 # print("terminated: {}".format(terminated))
                 # print("truncation: {}".format(truncation))
-                # print("======================================================")
+                print("======================================================")
 
                 action = None if terminated or truncation else env.action_space(agent).sample()  # random policy
                 # action = None # Doesn't work

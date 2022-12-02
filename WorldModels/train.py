@@ -24,6 +24,9 @@ def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
       os.makedirs(filedir)
   filebase = filedir+env_name+'.'+optimizer+'.'+str(num_episode)+'.'+str(population)
   controller = make_controller(args=config_args)
+  
+  # TODO: will need to create a controller for each agent by calling make_controller 3x  
+  # Will use 3 files (from series.py) to train each controller
 
   num_params = controller.param_count
   print("size of model", num_params)

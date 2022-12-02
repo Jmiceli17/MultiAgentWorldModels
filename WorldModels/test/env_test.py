@@ -3,7 +3,7 @@ env_tets.py
 
 Author:
     Joe Miceli
-    Mohammed Adib
+    Mohammed Adib Oumer
 
 Description:
     Script to test implementation of multiwalker environment wrapper for world models
