@@ -14,7 +14,7 @@ MODE_ZCH = 0
 MODE_ZC = 1
 MODE_Z = 2
 MODE_Z_HIDDEN = 3 # extra hidden later
-MODE_ZH = 4
+MODE_ZH = 4       ## This will probably be what's used for multiwalker
 
 def make_controller(args):
   # can be extended in the future.
@@ -26,6 +26,7 @@ def clip(x, lo=0.0, hi=1.0):
 
 class Controller:
   ''' simple one layer model for car racing '''
+  ## TODO: does anything in here need to change for multiwalker?
   def __init__(self, args):
     self.env_name = args.env_name
     self.exp_mode = args.exp_mode
@@ -48,6 +49,7 @@ class Controller:
 
     self.render_mode = args.render_mode
 
+  ## TODO: what do we need to do to modify this for multiwalker??
   def get_action(self, h):
     '''
     action = np.dot(h, self.weight) + self.bias
@@ -81,6 +83,7 @@ class Controller:
       self.bias = np.array(model_params[:self.a_width])
       self.weight = np.array(model_params[self.a_width:]).reshape(self.input_size, self.a_width)
 
+  ## See the Jupyter notebook file for an example of this getting used
   def load_model(self, filename):
     with open(filename) as f:    
       data = json.load(f)
@@ -116,12 +119,15 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
     obs = env.reset()
 
     total_reward = 0.0
-    for t in range(max_episode_length):
+    for step in range(max_episode_length):
+      ## TODO: do not render if this is the multiwalker env (this isn't how render is called for that env)
       if render_mode:
         env.render("human")
       else:
         env.render('rgb_array')
 
+      ####### TODO: for multiwalker env need to iterate through all agents but reward should be the same for each of them
+      ####### Do we need to use a different controller to select an action for each agent?
       action = controller.get_action(obs)
       obs, reward, done, info = env.step(action)
 
@@ -133,5 +139,63 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
       print("total reward", total_reward, "timesteps", t)
       env.close()
     reward_list.append(total_reward)
-    t_list.append(t)
+    t_list.append(step)
   return reward_list, t_list
+
+def simulate_multiple_controllers(controller_list, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
+  """
+  Function for simulating multiple controllers in a multi-agent environment, initially only intended to support the multiwalker env
+  """
+
+  # Initialize list to store total rewards from each episode
+  reward_list = []
+  # Initialize list to store the number of steps taken in each episode
+  t_list = []
+  # Use the first controller to get the max ep length (note that each controller should have the same arguments)
+  max_episode_length = controller_list[0].args.max_frames # should be equal to env.max_cycles
+
+  # Override max_episode length if we're using this simulation for training
+  if train_mode and max_len > 0:
+    max_episode_length = max_len
+
+  # Seed the environment #TODO: need to verify this is correct for multiwalker
+  if (seed >= 0):
+    random.seed(seed)
+    np.random.seed(seed)
+    env.seed(seed)    
+
+  # Run num_episode # of simulations
+  for episode in range(num_episode):
+
+    if train_mode: 
+      print('episode: {}/{}'.format(episode, num_episode))
+
+    # Initialize the environment
+    env.reset()
+    total_reward = 0.0
+    
+    for step in range(max_episode_length):
+
+      # There's multiple agents in this environment so each of them must apply an action
+      for agent in env.agent_iter():
+        # Get an observation for this agent
+        obs, totalRewardFromStep, done, truncation, info = env.last()
+        # Sample a random action for this agent
+        action = None if done or truncation else controller_list[agent].get_action(obs) # TODO: need to figure out to access individual controllers
+        # Apply the action for this agent
+        env.step(action)
+
+        # TODO: verify multiwalker env supples the total reward up to that point
+        # Update the total reward, each agent should be getting the same reward so it's ok to update it during each agent's actions
+        total_reward = totalRewardFromStep
+
+      # If the env is terminated, start the next simulation, this value is the the same for all agents
+      if done:
+        break
+
+    # Store the total reward and the number of steps taken during this simulation  
+    reward_list.append(total_reward)
+    t_list.append(step)
+
+  return reward_list, t_list
+

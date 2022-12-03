@@ -48,10 +48,10 @@ try:
                 # )        
                 observation, reward, terminated, truncation, info = env.last()
                 print("======================================================")
-                print("observation: {}".format(observation))
+                #print("observation: {}".format(observation))
                 print("reward: {}".format(reward))
-                # print("terminated: {}".format(terminated))
-                # print("truncation: {}".format(truncation))
+                print("terminated: {}".format(terminated))
+                print("truncation: {}".format(truncation))
                 print("======================================================")
 
                 action = None if terminated or truncation else env.action_space(agent).sample()  # random policy

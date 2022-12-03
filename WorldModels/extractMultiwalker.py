@@ -57,9 +57,10 @@ for trial in range(args.max_trials):
 
         previousReward = 0.0
 
-        # for i in range(args.max_frames):
+        # max_frames same as max_cycles in multiwalker environment
+        for cycle in range(args.max_frames):
         ######## TODO: make this configurable
-        for i in range(50):
+        #for i in range(50):
 
             # There's multiple agents in this environment so each of them must apply an action
             for agent in env.agent_iter():
@@ -93,12 +94,16 @@ for trial in range(args.max_trials):
             # print("[DEBUGGING] recording_reward: {}".format(recording_reward))
             # print("[DEBUGGING] recording_done: {}".format(recording_done))
             
-            # If the env is terminated, start the next simulation
+            # If the env is terminated, start the next simulation, should be the same for all agents
             if done:
                 print('[INFO] total reward {}'.format(totalReward))
                 break
 
-        
+        # Every cycle of every trial/simulation, the observations/actions/rewards/done get concatenated together so
+        # here, recording_obs contains the observations for each agent for this cycle stacked on top of each other
+        # recording_action contains the actions for each agent for this cycle stacked on top of each other, etc.
+        # the resulting dimensions at the end of each trial will be something like 
+        # [number of cycles peformed x len(obs)], [number of cycles peformed x len(action)], etc.
         recording_agent = np.array(recording_agent, dtype=str) 
         recording_obs = np.array(recording_obs, dtype=np.float16)
         recording_action = np.array(recording_action, dtype=np.float16)

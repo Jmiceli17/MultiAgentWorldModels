@@ -27,7 +27,7 @@ try:
     print("[INFO] DIR NAME: {}".format(dirname))
     # Get list of filenames
     filenames = os.listdir(dirname)
-    print(len(filenames))
+    print("[INFO] number of files: {}".format(len(filenames)))
     # Loop thru all file names
     for j, fname in enumerate(filenames):
             if not fname.endswith('npz'): 
@@ -35,6 +35,8 @@ try:
             file_path = os.path.join(dirname,fname)
 
             with np.load(file_path) as data:
+                print("[INFO] File name: {}".format(fname))
+
                 raw_agents = data['agent']
                 raw_obs = data['obs']
                 raw_actions = data['action']
@@ -48,9 +50,9 @@ try:
                 # print("[DEBUGGING] raw_rewards:\n {}".format(raw_rewards))
                 # # print("[DEBUGGING] raw_done:\n {}".format(raw_done))
                 
-    print("O,A,R,D,ag: ",raw_obs.shape, raw_actions.shape, raw_rewards.shape, raw_done.shape, raw_agents.shape)
-    print("Omean,Amean: ",raw_obs.mean(axis=0).shape, raw_actions.mean(axis=0).shape)
-    print("Ovar,Avar: ",raw_obs.var(axis=0).shape, raw_actions.var(axis=0).shape)
+            print("O,A,R,D,ag: ",raw_obs.shape, raw_actions.shape, raw_rewards.shape, raw_done.shape, raw_agents.shape)
+            print("Omean,Amean: ",raw_obs.mean(axis=0).shape, raw_actions.mean(axis=0).shape)
+            print("Ovar,Avar: ",raw_obs.var(axis=0).shape, raw_actions.var(axis=0).shape)
     print("[TEST PASSED!] Data printed successfully")            
 
 

@@ -1,4 +1,4 @@
-from mpi4py import MPI
+from mpi4py import MPI  # Package for Message Passing Interface, allows python apps to exploit multiple processors 
 import numpy as np
 import json
 import os
@@ -31,6 +31,7 @@ def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
   num_params = controller.param_count
   print("size of model", num_params)
 
+  ## TODO: we will need to instantiate an optimizer for each controller
   if optimizer == 'ses':
     ses = PEPG(num_params,
       sigma_init=sigma_init,
@@ -152,7 +153,9 @@ def decode_result_packet(packet):
 
 def worker(weights, seed, train_mode_int=1, max_len=-1):
   train_mode = (train_mode_int == 1)
+  ## TODO: modify to support a controller for each agent
   controller.set_model_params(weights)
+  ## TODO: modify simulate to use multiple controllers
   if train_mode_int == True:
     reward_list, t_list = simulate(controller, env,
 	    train_mode=train_mode, render_mode=False, num_episode=num_episode, seed=seed, max_len=max_len)
@@ -161,14 +164,15 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
         train_mode=train_mode, render_mode=False, num_episode=num_test_episode, seed=seed, max_len=max_len)
   if batch_mode == 'min':
     reward = np.min(reward_list)
-  else:
-    reward = np.mean(reward_list)
-  t = np.mean(t_list)
+  else: ## batch_mode == 'mean'
+    reward = np.mean(reward_list) ## mean total reward from all simulations
+  t = np.mean(t_list)             ## mean number of steps during all simulations
   print(t, reward)
   return reward, t
 
 def slave():
-  global env
+  global env ## TODO: deconflict name with what's used in mpi_fork()?
+  ## TODO: add env for multiwalker
   if env_name == 'CarRacing-v0':
     env = make_env(args=config_args, dream_env=False) # training in dreams not supported yet
   else:
@@ -227,12 +231,15 @@ def receive_packets_from_slaves():
 def evaluate_batch(model_params, test_seed, max_len=-1):
   # runs only from master since mpi and Doom was janky
   controller.set_model_params(model_params)
+  ## TODO: will need to modify simulate() to use multiple controllers
   rewards_list, t_list = simulate(controller, test_env,
-        train_mode=False, render_mode=False, num_episode=num_test_episode, seed=test_seed, max_len=max_len)
+        train_mode=False, render_mode=False, num_episode=num_test_episode, seed=test_seed, max_len=max_len) ## TODO: why is train_mode false here?
   return rewards_list
 
 def master():
   global test_env
+  ## Construct the environment to be used to evaluate the controller at various stages in the optimization process
+  ## This env is used when train_mode is set to False in simulate(...)
   if env_name == 'CarRacing-v0':
     test_env = make_env(args=config_args, dream_env=False)
   else:
@@ -248,6 +255,7 @@ def master():
 
   seeder = Seeder(seed_start)
 
+  ## We have 3 controllers so may need to create 3 sets of files
   filename = filebase+'.json'
   filename_log = filebase+'.log.json'
   filename_hist = filebase+'.hist.json'
@@ -255,7 +263,7 @@ def master():
   filename_hist_best = filebase+'.hist_best.json'
   filename_best = filebase+'.best.json'
   
-  t = 0
+  t = 0  ## "Generation"
 
   history = []
   history_best = [] # stores evaluation averages every 25 steps or so
@@ -266,7 +274,9 @@ def master():
 
   max_len = -1 # max time steps (-1 means ignore)
   while True:
-    solutions = es.ask()
+    ## ask/tell interface is one way of running the optimizer
+    ## ask delivers a new candidate solution and tell updates the optimizer instance by passing respective function values
+    solutions = es.ask()  
 
     if antithetic:
       seeds = seeder.next_batch(int(es.popsize/2))
@@ -318,7 +328,11 @@ def master():
     if (t == 1):
       best_reward_eval = avg_reward
     if (t % eval_steps == 0): # evaluate on actual task at hand
-
+      ## TODO: Need to determine how to evaluate each controller - they can't really be evaluated separately
+      ## when running evaluate_batch (and generating a simulation from each controller), the controller for each agent must be used
+      ## BUT the reward returned from evaluation should be the same for each controller (at least this is the configuration of multiwalker
+      ## we're using)
+      ## TODO: if all controllers share rewards, how are they going to be optimzied differently?
       prev_best_reward_eval = best_reward_eval
       model_params_quantized = np.array(es.current_param()).round(4)
       reward_eval_list = evaluate_batch(model_params_quantized, max_len=-1, test_seed=t)
@@ -364,7 +378,7 @@ def main(args):
   num_episode = args.controller_num_episode
   num_test_episode = args.controller_num_test_episode
   eval_steps = args.controller_eval_steps
-  num_worker = args.controller_num_worker
+  num_worker = args.controller_num_worker ## May be a good idea to keep this very small for running on a personal laptop
   num_worker_trial = args.controller_num_worker_trial
   antithetic = (args.controller_antithetic == 1)
   retrain_mode = (args.controller_retrain == 1)
@@ -409,5 +423,5 @@ def mpi_fork(n):
 
 if __name__ == "__main__":
   args = PARSER.parse_args()
-  if "parent" == mpi_fork(args.controller_num_worker+1): os.exit()
+  if "parent" == mpi_fork(args.controller_num_worker+1): os.exit()  ## TODO: make this configurable so we don't have to use threading?
   main(args)
