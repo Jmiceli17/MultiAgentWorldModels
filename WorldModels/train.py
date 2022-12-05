@@ -17,73 +17,153 @@ rank = comm.Get_rank()
 ###
 
 def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
-  global population, filebase, game, controller, num_params, es, PRECISION, SOLUTION_PACKET_SIZE, RESULT_PACKET_SIZE
+  global population, filebase, game, controller, num_params, es, PRECISION, SOLUTION_PACKET_SIZE, RESULT_PACKET_SIZE, CONTROLLER_LIST, ES_LIST
   population = num_worker * num_worker_trial
   filedir = 'results/{}/{}/log/'.format(exp_name, env_name)
   if not os.path.exists(filedir):
       os.makedirs(filedir)
   filebase = filedir+env_name+'.'+optimizer+'.'+str(num_episode)+'.'+str(population)
-  controller = make_controller(args=config_args)
-  
-  # TODO: will need to create a controller for each agent by calling make_controller 3x  
-  # Will use 3 files (from series.py) to train each controller
+  # TODO: Will use 3 files (from series.py) to train each controller
 
-  num_params = controller.param_count
-  print("size of model", num_params)
+  # If we're using the multiwalker environment, we need to create a controller for each agent
+  # TODO: make the number of controllers configurable
+  if (exp_name == 'multiwalker_v9'):
+    controller0 = make_controller(args=config_args)
+    controller1 = make_controller(args=config_args)
+    controller2 = make_controller(args=config_args)
+    CONTROLLER_LIST = [controller0, controller1, controller2]
 
-  ## TODO: we will need to instantiate an optimizer for each controller
-  if optimizer == 'ses':
-    ses = PEPG(num_params,
-      sigma_init=sigma_init,
-      sigma_decay=sigma_decay,
-      sigma_alpha=0.2,
-      sigma_limit=0.02,
-      elite_ratio=0.1,
-      weight_decay=0.005,
-      popsize=population)
-    es = ses
-  elif optimizer == 'ga':
-    ga = SimpleGA(num_params,
-      sigma_init=sigma_init,
-      sigma_decay=sigma_decay,
-      sigma_limit=0.02,
-      elite_ratio=0.1,
-      weight_decay=0.005,
-      popsize=population)
-    es = ga
-  elif optimizer == 'cma':
-    cma = CMAES(num_params,
-      sigma_init=sigma_init,
-      popsize=population)
-    es = cma
-  elif optimizer == 'pepg':
-    pepg = PEPG(num_params,
-      sigma_init=sigma_init,
-      sigma_decay=sigma_decay,
-      sigma_alpha=0.20,
-      sigma_limit=0.02,
-      learning_rate=0.01,
-      learning_rate_decay=1.0,
-      learning_rate_limit=0.01,
-      weight_decay=0.005,
-      popsize=population)
-    es = pepg
+    num_params = controller0.param_count  # all controllers have the same number of dimensions
+    print("size of model", num_params)
+
+    # Instantiate the optimizer to be used for each controller
+    # TODO: does an optimizer need to be instantiated for each controller?
+    if optimizer == 'ses':
+      ses = PEPG(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_alpha=0.2,
+        sigma_limit=0.02,
+        elite_ratio=0.1,
+        weight_decay=0.005,
+        popsize=population)
+      es0 = ses
+      es1 = ses
+      es2 = ses
+    elif optimizer == 'ga':
+      ga = SimpleGA(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_limit=0.02,
+        elite_ratio=0.1,
+        weight_decay=0.005,
+        popsize=population)
+      es0 = ga
+      es1 = ga
+      es2 = ga
+    elif optimizer == 'cma':
+      cma = CMAES(num_params,
+        sigma_init=sigma_init,
+        popsize=population)
+      es0 = cma
+      es1 = cma
+      es2 = cma
+    elif optimizer == 'pepg':
+      pepg = PEPG(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_alpha=0.20,
+        sigma_limit=0.02,
+        learning_rate=0.01,
+        learning_rate_decay=1.0,
+        learning_rate_limit=0.01,
+        weight_decay=0.005,
+        popsize=population)
+      es0 = pepg
+      es1 = pepg
+      es2 = pepg
+    else:
+      oes = OpenES(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_limit=0.02,
+        learning_rate=0.01,
+        learning_rate_decay=1.0,
+        learning_rate_limit=0.01,
+        antithetic=antithetic,
+        weight_decay=0.005,
+        popsize=population)
+      es0 = oes
+      es1 = oes
+      es2 = oes
+
+    ES_LIST = [es0, es1, es2] # TODO: could make this a dictionary that maps controllers to optimizers
+    PRECISION = 10000
+    SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial
+    RESULT_PACKET_SIZE = 4*num_worker_trial
+
+  # Else we're using an environment with a single agent
   else:
-    oes = OpenES(num_params,
-      sigma_init=sigma_init,
-      sigma_decay=sigma_decay,
-      sigma_limit=0.02,
-      learning_rate=0.01,
-      learning_rate_decay=1.0,
-      learning_rate_limit=0.01,
-      antithetic=antithetic,
-      weight_decay=0.005,
-      popsize=population)
-    es = oes
+    controller = make_controller(args=config_args)
+    
+    CONTROLLER_LIST = [controller]
+    
+    num_params = controller.param_count
+    print("size of model", num_params)
 
-  PRECISION = 10000
-  SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial
-  RESULT_PACKET_SIZE = 4*num_worker_trial
+    ## TODO: we will need to instantiate an optimizer for each controller
+    if optimizer == 'ses':
+      ses = PEPG(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_alpha=0.2,
+        sigma_limit=0.02,
+        elite_ratio=0.1,
+        weight_decay=0.005,
+        popsize=population)
+      es = ses
+    elif optimizer == 'ga':
+      ga = SimpleGA(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_limit=0.02,
+        elite_ratio=0.1,
+        weight_decay=0.005,
+        popsize=population)
+      es = ga
+    elif optimizer == 'cma':
+      cma = CMAES(num_params,
+        sigma_init=sigma_init,
+        popsize=population)
+      es = cma
+    elif optimizer == 'pepg':
+      pepg = PEPG(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_alpha=0.20,
+        sigma_limit=0.02,
+        learning_rate=0.01,
+        learning_rate_decay=1.0,
+        learning_rate_limit=0.01,
+        weight_decay=0.005,
+        popsize=population)
+      es = pepg
+    else:
+      oes = OpenES(num_params,
+        sigma_init=sigma_init,
+        sigma_decay=sigma_decay,
+        sigma_limit=0.02,
+        learning_rate=0.01,
+        learning_rate_decay=1.0,
+        learning_rate_limit=0.01,
+        antithetic=antithetic,
+        weight_decay=0.005,
+        popsize=population)
+      es = oes
+    ES_LIST = [es]
+    PRECISION = 10000
+    SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial
+    RESULT_PACKET_SIZE = 4*num_worker_trial
 ###
 
 def sprint(*args):
@@ -155,7 +235,7 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
   train_mode = (train_mode_int == 1)
   ## TODO: modify to support a controller for each agent
   controller.set_model_params(weights)
-  ## TODO: modify simulate to use multiple controllers
+
   if train_mode_int == True:
     reward_list, t_list = simulate(controller, env,
 	    train_mode=train_mode, render_mode=False, num_episode=num_episode, seed=seed, max_len=max_len)
@@ -173,16 +253,16 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
 def slave():
   global env ## TODO: deconflict name with what's used in mpi_fork()?
   ## TODO: add env for multiwalker
-  if env_name == 'CarRacing-v0':
+  if env_name == 'CarRacing-v0' or env_name == 'multiwalker_v9':
     env = make_env(args=config_args, dream_env=False) # training in dreams not supported yet
   else:
     env = make_env(args=config_args, dream_env=True, render_mode=False)
 
   packet = np.empty(SOLUTION_PACKET_SIZE, dtype=np.int32)
-  while 1:
+  while 1:  # TDOD: how does this loop end?
     comm.Recv(packet, source=0)
     assert(len(packet) == SOLUTION_PACKET_SIZE)
-    solutions = decode_solution_packet(packet)
+    solutions = decode_solution_packet(packet)  ## solutions is specific to a single controller
     results = []
     for solution in solutions:
       worker_id, jobidx, seed, train_mode, max_len, weights = solution
@@ -192,7 +272,7 @@ def slave():
       assert worker_id == rank, possible_error
       jobidx = int(jobidx)
       seed = int(seed)
-      fitness, timesteps = worker(weights, seed, train_mode, max_len)
+      fitness, timesteps = worker(weights, seed, train_mode, max_len) ## Here we need to call worker for each controller
       results.append([worker_id, jobidx, fitness, timesteps])
     result_packet = encode_result_packet(results)
     assert len(result_packet) == RESULT_PACKET_SIZE
@@ -237,12 +317,13 @@ def evaluate_batch(model_params, test_seed, max_len=-1):
   return rewards_list
 
 def master():
-  global test_env
+  global test_env # TODO: Get rid of global variables
   ## Construct the environment to be used to evaluate the controller at various stages in the optimization process
   ## This env is used when train_mode is set to False in simulate(...)
   if env_name == 'CarRacing-v0':
     test_env = make_env(args=config_args, dream_env=False)
   else:
+    # Use these environment arguments for Doom and Multiwalker
     test_env = make_env(args=config_args, dream_env=False, render_mode=False)
 
 
@@ -273,9 +354,12 @@ def master():
   best_model_params_eval = None
 
   max_len = -1 # max time steps (-1 means ignore)
-  while True:
-    ## ask/tell interface is one way of running the optimizer
-    ## ask delivers a new candidate solution and tell updates the optimizer instance by passing respective function values
+  while True: # TODO: how does this loop end? should this be "while not es.stop()" 
+    
+    # loop through all optimzers
+    # for es, controller in zip(ES_LIST, CONTROLLER_LIST):
+    # ask/tell interface is one way of running the optimizer
+    # ask returns new candidate solutions, sampled from a multi-variate normal distribution and transformed to f-representation (phenotype) to be evaluated.	 
     solutions = es.ask()  
 
     if antithetic:
@@ -294,16 +378,17 @@ def master():
     max_time_step = int(np.max(reward_list_total[:, 1])*100)/100. # get average time step
     avg_reward = int(np.mean(reward_list)*100)/100. # get average time step
     std_reward = int(np.std(reward_list)*100)/100. # get average time step
-
+    
+    # Tell updates the optimizer instance by passing respective function values
     es.tell(reward_list)
 
-    es_solution = es.result()
+    es_solution = es.result() # Returns (xbest, f(xbest), evaluations_xbest, evaluations, iterations, pheno(xmean), effective_stds)
     model_params = es_solution[0] # best historical solution
     reward = es_solution[1] # best reward
     curr_reward = es_solution[2] # best of the current batch
     controller.set_model_params(np.array(model_params).round(4))
 
-    r_max = int(np.max(reward_list)*100)/100.
+    r_max = int(np.max(reward_list)*100)/100. 
     r_min = int(np.min(reward_list)*100)/100.
 
     curr_time = int(time.time()) - start_time
@@ -350,12 +435,14 @@ def master():
       with open(filename_log, 'wt') as out:
         res = json.dump(eval_log, out)
       if (len(eval_log) == 1 or reward_eval > best_reward_eval):
-        best_reward_eval = reward_eval
+        # New reward is the best we've seen so far so store this value 
+        best_reward_eval = reward_eval 
+        # Store the params used to generate the best reward 
         best_model_params_eval = model_params_quantized
       else:
         if retrain_mode:
           sprint("reset to previous best params, where best_reward_eval =", best_reward_eval)
-          es.set_mu(best_model_params_eval)
+          es.set_mu(best_model_params_eval) # Only implemented for OpenES and PEPG, does not do anything for CMAES
       with open(filename_best, 'wt') as out:
         res = json.dump([best_model_params_eval, best_reward_eval], out, sort_keys=True, indent=0, separators=(',', ': '))
       # dump history of best
@@ -372,6 +459,7 @@ def master():
 
 
 def main(args):
+  # TODO: get rid of global variables...
   global optimizer, num_episode, num_test_episode, eval_steps, num_worker, num_worker_trial, antithetic, seed_start, retrain_mode, cap_time_mode, env_name, exp_name, batch_mode, config_args
 
   optimizer = args.controller_optimizer
@@ -423,5 +511,5 @@ def mpi_fork(n):
 
 if __name__ == "__main__":
   args = PARSER.parse_args()
-  if "parent" == mpi_fork(args.controller_num_worker+1): os.exit()  ## TODO: make this configurable so we don't have to use threading?
+  #if "parent" == mpi_fork(args.controller_num_worker+1): os.exit()  ## TODO: make this configurable so we don't have to use threading?
   main(args)

@@ -353,7 +353,7 @@ def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=Fal
     print('making multiwalker environment')
     # TODO: make init configurable
     env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
-terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames) # Could also call .env() here
+terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames) 
     env = MultiwalkerMDNRNN(args=args, env=env, full_episode=full_episode, load_model=load_model)
   
   else:

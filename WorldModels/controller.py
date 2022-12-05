@@ -61,11 +61,16 @@ class Controller:
       h = np.tanh(np.dot(h, self.weight_hidden) + self.bias_hidden)
       action = np.tanh(np.dot(h, self.weight_output) + self.bias_output)
     else:
-      action = np.tanh(np.dot(h, self.weight) + self.bias)
+      action = np.tanh(np.dot(h, self.weight) + self.bias)  # This should be what's used for multiwalker, keeps outputs between -1 and 1
     
+    # Car Racing steering wheel action has range -1 to 1, the acceleration pedal ranges from 0 to 1, and the brakes range from 0 to 1
     if self.env_name == 'CarRacing-v0': 
       action[1] = (action[1]+1.0) / 2.0
       action[2] = clip(action[2])
+
+    # Check that action is correct size for the multiwalker env
+    if self.env_name == 'multiwalker_v9':
+      assert len(action)==4, "[error][controller.py], action should be 4 elements for multiwalker environment"
 
     return action
 
@@ -126,8 +131,6 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
       else:
         env.render('rgb_array')
 
-      ####### TODO: for multiwalker env need to iterate through all agents but reward should be the same for each of them
-      ####### Do we need to use a different controller to select an action for each agent?
       action = controller.get_action(obs)
       obs, reward, done, info = env.step(action)
 
@@ -136,7 +139,7 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
         break
 
     if render_mode:
-      print("total reward", total_reward, "timesteps", t)
+      print("total reward", total_reward, "timesteps", step)
       env.close()
     reward_list.append(total_reward)
     t_list.append(step)
@@ -185,7 +188,7 @@ def simulate_multiple_controllers(controller_list, env, train_mode=False, render
         # Apply the action for this agent
         env.step(action)
 
-        # TODO: verify multiwalker env supples the total reward up to that point
+        # TODO: verify multiwalker env supples the total reward up to that point!!!!!!!!!!!!!!!
         # Update the total reward, each agent should be getting the same reward so it's ok to update it during each agent's actions
         total_reward = totalRewardFromStep
 
