@@ -14,7 +14,7 @@ args = PARSER.parse_args()
 DATA_DIR = "results/{}/{}/record".format(args.exp_name, args.env_name)
 SERIES_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)    ## This is the data that is used to train the RNN, in the original paper, it containes data processed by the VAE
 # model_path_name = "results/{}/{}/tf_vae".format(args.exp_name, args.env_name)
-num_eps = 10000#150#   #TODO: what is this for? Should it come from config? - would rather not. Was experimenting on it.
+num_eps = 150#10000#   #TODO: what is this for? Should it come from config? - would rather not. Was experimenting on it.
 
 num_agents = 3
 indices = tf.range(num_agents)
