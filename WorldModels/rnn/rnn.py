@@ -36,7 +36,7 @@ class MDNRNN(tf.keras.Model):
             tf.keras.layers.Dense(args.rnn_out_size, name="mu_logstd_logmix_net")])
 
         super(MDNRNN, self).build((self.args.rnn_batch_size, self.args.rnn_max_seq_len, self.args.rnn_input_seq_width))
-
+        
     def get_loss(self):
         num_mixture = self.args.rnn_num_mixture
         batch_size = self.args.rnn_batch_size
@@ -101,7 +101,7 @@ class MDNRNN(tf.keras.Model):
         return self.__call__(inputs, training)
 
     def __call__(self, inputs, training=True):
-        rnn_out, _, _ = self.inference_base(inputs)
+        rnn_out, _, _ = self.inference_base(inputs, training=training)
 
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
         out = self.out_net(rnn_out)

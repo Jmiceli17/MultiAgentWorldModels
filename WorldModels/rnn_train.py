@@ -42,14 +42,15 @@ N_data = len(data_mu) # should be 10k
 # z = np.zeros((args.rnn_batch_size,args.rnn_max_seq_len,args.z_size+num_agents))
 # indices = np.random.permutation(N_data)[:args.rnn_batch_size]
 # for j in range(num_agents):
+#   # suboptimal b/c we are always only taking first set of steps
 #   mu = data_mu[indices[j::num_agents],j,:]
 #   logvar = data_logvar[indices[j::num_agents],j,:]
-#   for k in range(args.rnn_max_seq_len-1000):
+#   for k in range(args.rnn_max_seq_len):
 #     z[j::num_agents,k,:] = sample_vae(mu, logvar)
 #     z[j::num_agents,k,:num_agents] = (z[j::num_agents,k,:num_agents]!=0.).astype(int)
 # action = data_action[indices,:args.rnn_max_seq_len,:]
 # d = tf.cast(data_d[indices], tf.float32)[:,:args.rnn_max_seq_len]
-# print(N_data, z.shape, action.shape, tf.concat([z, action], axis=2).shape)
+# print(N_data, z.shape, action.shape, d.shape, tf.concat([z, action], axis=2).shape)
 
 '''
 # # save 1000 initial mu and logvars. Used for sampling when training in dreams
@@ -86,7 +87,7 @@ def random_batch():
 rnn = MDNRNN(args=args)
 rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the model for training
 
-# # train loop:
+# train loop:
 start = time.time()
 step = 0              ## Number of steps to take in the env
 for step in range(args.rnn_num_steps):
@@ -96,12 +97,13 @@ for step in range(args.rnn_num_steps):
   raw_z, raw_a, raw_d = random_batch()
 
   inputs = tf.concat([raw_z, raw_a], axis=2)
+  if step == 0: # thank you original paper
+    rnn._set_inputs(inputs)
 
   dummy_zero = tf.zeros([raw_z.shape[0], 1, raw_z.shape[2]], dtype=tf.float32)
   z_targ = tf.concat([raw_z[:, 1:, :], dummy_zero], axis=1) # zero pad the end but we don't actually use it
   z_mask = 1.0 - raw_d
   z_targ = tf.concat([z_targ, z_mask], axis=2) # use a signal to not pass grad
-
     
   if args.env_name == 'DoomTakeCover-v0':
     d_mask = tf.concat([tf.ones([args.rnn_batch_size, 1, 1], dtype=tf.float32), 1.0 - raw_d[:, :-1, :]], axis=1)
@@ -109,7 +111,6 @@ for step in range(args.rnn_num_steps):
     outputs = [z_targ, d_targ]
   else:
     outputs = z_targ
-
 
   loss = rnn.train_on_batch(x=inputs, y=outputs)
 
@@ -124,5 +125,10 @@ for step in range(args.rnn_num_steps):
     else:
       output_log = "step: %d, lr: %.6f, loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss, time_taken)
     print(output_log)
+    
+    # dataset = tf.data.Dataset.from_tensors((inputs,outputs))
+    # rnn.fit(dataset,epochs=1)
+    # rnn.predict(np.random.rand(args.rnn_batch_size, args.rnn_max_seq_len, args.rnn_input_seq_width)) # stupid tf
 
+    print("Saved? ",rnn.save_spec() is not None)
     tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
