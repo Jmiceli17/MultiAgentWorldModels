@@ -25,7 +25,8 @@ tf.config.experimental_run_functions_eagerly # used for debugging
 args = PARSER.parse_args()
 
 DATA_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)
-model_save_path = "results/{}/{}/tf_rnn".format(args.exp_name, args.env_name)
+# model_save_path = "results/{}/{}/tf_rnn".format(args.exp_name, args.env_name)
+model_save_path = "results/{}".format(args.env_name)
 if not os.path.exists(model_save_path):
   os.makedirs(model_save_path)
 
@@ -85,6 +86,8 @@ def random_batch():
 
 rnn = MDNRNN(args=args)
 rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the model for training
+print("[INFO] Model Summary")
+rnn.summary()
 
 # # train loop:
 start = time.time()
@@ -110,19 +113,39 @@ for step in range(args.rnn_num_steps):
   else:
     outputs = z_targ
 
+  
+  #loss = rnn.train_on_batch(x=inputs, y=outputs)
+  history = rnn.fit(x=inputs, y=outputs, batch_size=args.rnn_batch_size)
 
-  loss = rnn.train_on_batch(x=inputs, y=outputs)
+  #rnn(inputs) # call Model.call()
+  print("[DEBUGGING] Model history: {}".format(history.history))
+  print("[DEBUGGING] Model loss: {}".format(history.history["loss"]))
+
+  # print("[DEBUGGING] Layer shapes")
+  # for layer in rnn.layers:
+  #   #layer.summary()
+  #   print(layer.output_shape)
 
   ## Every 20 steps
-  if (step%20==0 and step > 0):
+#  if (step%20==0 and step > 0):
+  if (step%5==0 and step > 0):
+
+    print("[INFO] Saving model...")
     end = time.time()
     time_taken = end-start
+    # Reset start time
     start = time.time()
     
-    if args.env_name == 'DoomTakeCover-v0':
-      output_log = "step: %d, lr: %.6f, loss: %.4f, z_loss: %.4f, d_loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss[0], loss[1], loss[2], time_taken)
-    else:
-      output_log = "step: %d, lr: %.6f, loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss, time_taken)
-    print(output_log)
+    # if args.env_name == 'DoomTakeCover-v0':
+    #   output_log = "step: %d, lr: %.6f, loss: %.4f, z_loss: %.4f, d_loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss[0], loss[1], loss[2], time_taken)
+    # else:
+    #   output_log = "step: %d, lr: %.6f, loss: %.4f, train_time_taken: %.4f" % (step, curr_learning_rate, loss, time_taken)
+    # print("[INFO] output_log: {}".format(output_log))
 
-    tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
+    # rnn.compute_output_shape((100, 1000, 38))
+    # print("[DEBUGGING] out_net shape: {}".format(tf.shape(rnn.out_net)))
+    # print("[DEBUGGING] Model Summary")
+    # rnn.summary()
+    # rnn.save(rnn, model_save_path, include_optimizer=True, save_format='tf')
+    # tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
+    tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True)

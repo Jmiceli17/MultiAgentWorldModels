@@ -34,7 +34,8 @@ class MDNRNN(tf.keras.Model):
         self.out_net = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=self.args.rnn_size),
             tf.keras.layers.Dense(args.rnn_out_size, name="mu_logstd_logmix_net")])
-
+        input_shape = (self.args.rnn_batch_size, self.args.rnn_max_seq_len, self.args.rnn_input_seq_width)
+        print("[DEBUGGING] Building RNN with input_shape: {}".format(input_shape))
         super(MDNRNN, self).build((self.args.rnn_batch_size, self.args.rnn_max_seq_len, self.args.rnn_input_seq_width))
 
     def get_loss(self):
@@ -98,9 +99,7 @@ class MDNRNN(tf.keras.Model):
         self.set_weights(rand_params)
     
     def call(self, inputs, training=True):
-        return self.__call__(inputs, training)
-
-    def __call__(self, inputs, training=True):
+        # return self.__call__(inputs, training)
         rnn_out, _, _ = self.inference_base(inputs)
 
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
@@ -111,6 +110,18 @@ class MDNRNN(tf.keras.Model):
           return mdnrnn_params, done_logits
         else: 
           return out
+
+    # def __call__(self, inputs, training=True):
+    #     rnn_out, _, _ = self.inference_base(inputs)
+
+    #     rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
+    #     out = self.out_net(rnn_out)
+
+    #     if self.args.env_name == 'DoomTakeCover-v0':
+    #       mdnrnn_params, done_logits = out[:, :-1], out[:, -1:]
+    #       return mdnrnn_params, done_logits
+    #     else: 
+    #       return out
           
 
 @tf.function
