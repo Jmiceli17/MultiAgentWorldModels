@@ -252,11 +252,11 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
 
 def slave():
   global env ## TODO: deconflict name with what's used in mpi_fork()?
-  ## TODO: add env for multiwalker
+  # Create an env to conduct training, note that here we use the rnn params trained in rnn_train.py
   if env_name == 'CarRacing-v0' or env_name == 'multiwalker_v9':
-    env = make_env(args=config_args, dream_env=False) # training in dreams not supported yet
+    env = make_env(args=config_args, dream_env=False, load_model=True) # training in dreams not supported yet
   else:
-    env = make_env(args=config_args, dream_env=True, render_mode=False)
+    env = make_env(args=config_args, dream_env=True, render_mode=False, load_model=True)
 
   packet = np.empty(SOLUTION_PACKET_SIZE, dtype=np.int32)
   while 1:  # TDOD: how does this loop end?
@@ -318,13 +318,14 @@ def evaluate_batch(model_params, test_seed, max_len=-1):
 
 def master():
   global test_env # TODO: Get rid of global variables
-  ## Construct the environment to be used to evaluate the controller at various stages in the optimization process
-  ## This env is used when train_mode is set to False in simulate(...)
+  # Construct the environment to be used to evaluate the controller at various stages in the optimization process
+  # This env is used when train_mode is set to False in simulate(...)
+  # Note that the env here is created using the rnn params that were trained in rnn_train.py
   if env_name == 'CarRacing-v0':
-    test_env = make_env(args=config_args, dream_env=False)
+    test_env = make_env(args=config_args, dream_env=False, load_model=True)
   else:
     # Use these environment arguments for Doom and Multiwalker
-    test_env = make_env(args=config_args, dream_env=False, render_mode=False)
+    test_env = make_env(args=config_args, dream_env=False, render_mode=False, load_model=True)
 
 
   start_time = int(time.time())
@@ -336,7 +337,7 @@ def master():
 
   seeder = Seeder(seed_start)
 
-  ## We have 3 controllers so may need to create 3 sets of files
+  # We have 3 controllers so may need to create 3 sets of files
   filename = filebase+'.json'
   filename_log = filebase+'.log.json'
   filename_hist = filebase+'.hist.json'
@@ -344,7 +345,7 @@ def master():
   filename_hist_best = filebase+'.hist_best.json'
   filename_best = filebase+'.best.json'
   
-  t = 0  ## "Generation"
+  t = 0  # "Generation (for all optimizers)"
 
   history = []
   history_best = [] # stores evaluation averages every 25 steps or so
@@ -413,11 +414,7 @@ def master():
     if (t == 1):
       best_reward_eval = avg_reward
     if (t % eval_steps == 0): # evaluate on actual task at hand
-      ## TODO: Need to determine how to evaluate each controller - they can't really be evaluated separately
-      ## when running evaluate_batch (and generating a simulation from each controller), the controller for each agent must be used
-      ## BUT the reward returned from evaluation should be the same for each controller (at least this is the configuration of multiwalker
-      ## we're using)
-      ## TODO: if all controllers share rewards, how are they going to be optimzied differently?
+
       prev_best_reward_eval = best_reward_eval
       model_params_quantized = np.array(es.current_param()).round(4)
       reward_eval_list = evaluate_batch(model_params_quantized, max_len=-1, test_seed=t)
