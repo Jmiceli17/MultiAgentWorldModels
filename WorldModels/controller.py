@@ -147,7 +147,7 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
     t_list.append(step)
   return reward_list, t_list
 
-def simulate_multiple_controllers(controller_list, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
+def simulate_multiple_controllers(controller_dict, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
   """
   Function for simulating multiple controllers in a multi-agent environment, initially only intended to support the multiwalker env
   """
@@ -157,7 +157,8 @@ def simulate_multiple_controllers(controller_list, env, train_mode=False, render
   # Initialize list to store the number of steps taken in each episode
   t_list = []
   # Use the first controller to get the max ep length (note that each controller should have the same arguments)
-  max_episode_length = controller_list[0].args.max_frames # should be equal to env.max_cycles
+  # TODO: make sure the key to this dictionary isn't hardcoded
+  max_episode_length = controller_dict[0].args.max_frames # should be equal to env.max_cycles
 
   # Override max_episode length if we're using this simulation for training
   if train_mode and max_len > 0:
@@ -181,18 +182,22 @@ def simulate_multiple_controllers(controller_list, env, train_mode=False, render
     
     for step in range(max_episode_length):
 
+      controller_id = 0
+
       # There's multiple agents in this environment so each of them must apply an action
       for agent in env.agent_iter():
         # Get an observation for this agent
         obs, totalRewardFromStep, done, truncation, info = env.last()
         # Sample a random action for this agent
-        action = None if done or truncation else controller_list[agent].get_action(obs) # TODO: need to figure out to access individual controllers
+        action = None if done or truncation else controller_dict[controller_id].get_action(obs) # TODO: need to figure out to access individual controllers
         # Apply the action for this agent
         env.step(action)
 
         # TODO: verify multiwalker env supples the total reward up to that point!!!!!!!!!!!!!!!
         # Update the total reward, each agent should be getting the same reward so it's ok to update it during each agent's actions
         total_reward = totalRewardFromStep
+
+        controller_id += 1
 
       # If the env is terminated, start the next simulation, this value is the the same for all agents
       if done:

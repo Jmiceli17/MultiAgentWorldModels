@@ -25,14 +25,20 @@ from es import CMAES, SimpleGA, OpenES, PEPG
 from utils import PARSER
 import argparse
 import time
+# import struct
+# from typing import NamedTuple
 
 ### MPI related code
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 ###
 
+# class PacketStruct(NamedTuple):
+#   seeds: int
+
+
 def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
-  global population, filebase, game, controller, num_params, es, PRECISION, SOLUTION_PACKET_SIZE, RESULT_PACKET_SIZE, CONTROLLER_LIST, ES_LIST
+  global population, filebase, game, controller, num_params, es, PRECISION, SOLUTION_PACKET_SIZE, RESULT_PACKET_SIZE, CONTROLLER_LIST, ES_LIST, CONTROLLER_DICT
   # global population, filebase, game, num_params, PRECISION, SOLUTION_PACKET_SIZE, RESULT_PACKET_SIZE, CONTROLLER_LIST, ES_LIST
   population = num_worker * num_worker_trial
   filedir = 'results/{}/{}/log/'.format(exp_name, env_name)
@@ -44,16 +50,17 @@ def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
   # If we're using the multiwalker environment, we need to create a controller for each agent
   # TODO: make the number of controllers configurable
   if (env_name == 'multiwalker_v9'):
-    controller0 = make_controller(args=config_args, id="Ctrl_0")
-    controller1 = make_controller(args=config_args, id="Ctrl_1")
-    controller2 = make_controller(args=config_args, id="Ctrl_2")
+    controller0 = make_controller(args=config_args, id=0)
+    controller1 = make_controller(args=config_args, id=1)
+    controller2 = make_controller(args=config_args, id=2)
     CONTROLLER_LIST = [controller0, controller1, controller2]
+    CONTROLLER_DICT = {controller0.ID : controller0,controller1.ID : controller1,controller2.ID : controller2}
     # print("[DEBUGGING] Length of controller list: {}".format(len(CONTROLLER_LIST)))
     # print("[DEBUGGING] controller0 ID: {}".format(controller0.ID))
 
     num_params = controller0.param_count  # all controllers have the same number of dimensions
     print("size of model", num_params)
-    print("[DEBUGGING] Optimizer selected: {}".format(optimizer))
+    # print("[DEBUGGING] Optimizer selected: {}".format(optimizer))
 
     # Instantiate the optimizer to be used for each controller
     # TODO: does an optimizer need to be instantiated for each controller?
@@ -118,9 +125,11 @@ def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
 
     ES_LIST = [es0, es1, es2] # TODO: could make this a dictionary that maps controllers to optimizers
     PRECISION = 10000
-    SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial
+    # SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial  # This specifies the buffer size for COMM_WORLD
+    SOLUTION_PACKET_SIZE = 3*(24+num_params*num_worker_trial)    # TODO: really need to figure out the relationship between dimensions and configs
     RESULT_PACKET_SIZE = 4*num_worker_trial
-
+    print("[DEBUGGING] SOLUTION_PACKET_SIZE: {}".format(SOLUTION_PACKET_SIZE))
+    print("[DEBUGGING] RESULT_PACKET_SIZE: {}".format(RESULT_PACKET_SIZE))
   # Else we're using an environment with a single agent
   else:
     controller = make_controller(args=config_args)
@@ -179,6 +188,7 @@ def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
         weight_decay=0.005,
         popsize=population)
       es = oes
+    
     ES_LIST = [es]
     PRECISION = 10000
     SOLUTION_PACKET_SIZE = (5+num_params)*num_worker_trial
@@ -212,15 +222,21 @@ class Seeder:
     result = np.random.randint(self.limit, size=batch_size).tolist()
     return result
 
-def encode_solution_packets(seeds, solutions, train_mode=1, max_len=-1):
-  # TODO: do we add information about the specific controller in here?
-  n = len(seeds)
+# def encode_solution_packets(seeds, solutions, train_mode=1, max_len=-1):
+def encode_solution_packets(solutions_dict, train_mode=1, max_len=-1):
+  
   result = []
   worker_num = 0
-  for i in range(n):
-    worker_num = int(i / num_worker_trial) + 1
-    result.append([worker_num, i, seeds[i], train_mode, max_len])
-    result.append(np.round(np.array(solutions[i])*PRECISION,0))
+  for controller_id in solutions_dict.keys():
+    seeds = solutions_dict[controller_id][1] # dict maps id to tuple of (solutions, seeds)
+    n = len(seeds)
+    for i in range(n):
+      worker_num = int(i / num_worker_trial) + 1
+      # result.append([worker_num, i, seeds[i], train_mode, max_len])
+      result.append([worker_num, i, seeds[i], train_mode, max_len, controller_id])
+      solutions = solutions_dict[controller_id][0] # dict maps id to tuple of (solutions, seeds)
+
+      result.append(np.round(np.array(solutions[i])*PRECISION,0))
   result = np.concatenate(result).astype(np.int32)
   result = np.split(result, num_worker)
   return result
@@ -229,7 +245,8 @@ def decode_solution_packet(packet):
   packets = np.split(packet, num_worker_trial)
   result = []
   for p in packets:
-    result.append([p[0], p[1], p[2], p[3], p[4], p[5:].astype(np.float)/PRECISION])
+    #result.append([p[0], p[1], p[2], p[3], p[4], p[5:].astype(np.float)/PRECISION])
+    result.append([p[0], p[1], p[2], p[3], p[4], p[5], p[6:].astype(np.float)/PRECISION]) # worker_id, jobidx, seed, train_mode, max_len, weights
   return result
 
 def encode_result_packet(results):
@@ -251,7 +268,8 @@ def decode_result_packet(packet):
     result.append([workers[i], jobs[i], fits[i], times[i]])
   return result
 
-def worker(weights, seed, train_mode_int=1, max_len=-1):
+# def worker(weights, seed, train_mode_int=1, max_len=-1):
+def worker(CONTROLLER_DICT, seed, train_mode_int=1, max_len=-1):
 
   print("[DEBUGGING] Worker is working")
   print("[DEBUGGING] Length of CONTROLLER_LIST: {}".format(len(CONTROLLER_LIST)))
@@ -265,18 +283,19 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
   # ...
   # Using the above paradigm, I don't think that the weights of the other controllers will be set. 
 
-  controller.set_model_params(weights)
+  # controller.set_model_params(weights)
 
   if env_name=='multiwalker_v9':
     if train_mode_int == True:
-      reward_list, t_list = simulate_multiple_controllers(CONTROLLER_LIST, env,
+      reward_list, t_list = simulate_multiple_controllers(CONTROLLER_DICT, env,
         train_mode=train_mode, render_mode=False, num_episode=num_episode, seed=seed, max_len=max_len)
     else:
-      reward_list, t_list = simulate_multiple_controllers(CONTROLLER_LIST, test_env,
+      reward_list, t_list = simulate_multiple_controllers(CONTROLLER_DICT, test_env,
           train_mode=train_mode, render_mode=False, num_episode=num_test_episode, seed=seed, max_len=max_len)
   # Else we're using car-racing or doom env
   else:
     if train_mode_int == True:
+      #TODO: update these to work with controller_dict or normal controller
       reward_list, t_list = simulate(controller, env,
         train_mode=train_mode, render_mode=False, num_episode=num_episode, seed=seed, max_len=max_len)
     else:
@@ -295,6 +314,8 @@ def worker(weights, seed, train_mode_int=1, max_len=-1):
 def slave():
   global env ## TODO: deconflict name with what's used in mpi_fork()?
   # Create an env to conduct training, note that here we use the rnn params trained in rnn_train.py
+  print("[DEBUGGING] Starting slave process...")
+  print("[DEBUGGING] Length of CONTROLLER_DICT: {}".format(len(CONTROLLER_DICT)))
   if env_name == 'CarRacing-v0' or env_name == 'multiwalker_v9':
     print("[DEBUGGING] Creating env for slave process...")
     env = make_env(args=config_args, dream_env=False, load_model=True) # training in dreams not supported yet
@@ -305,32 +326,38 @@ def slave():
   while 1:  # TODO: how does this loop end?
     comm.Recv(packet, source=0)
     # print("[DEBUGGING] packet received for controller: {}".format(controller.ID))
-    assert(len(packet) == SOLUTION_PACKET_SIZE)
+    # assert(len(packet) == SOLUTION_PACKET_SIZE) # TODO: put this back
     solutions = decode_solution_packet(packet)  ## solutions is specific to a single controller
     results = []
     for solution in solutions:
-      worker_id, jobidx, seed, train_mode, max_len, weights = solution
+      # worker_id, jobidx, seed, train_mode, max_len, weights = solution
+      worker_id, jobidx, seed, train_mode, max_len, controller_id, weights = solution
+      CONTROLLER_DICT[controller_id].set_model_params(weights)  # update the controller with the received weights
       assert (train_mode == 1 or train_mode == 0), str(train_mode)
       worker_id = int(worker_id)
       possible_error = "work_id = " + str(worker_id) + " rank = " + str(rank)
       assert worker_id == rank, possible_error
       jobidx = int(jobidx)
       seed = int(seed)
-      fitness, timesteps = worker(weights, seed, train_mode, max_len) ## Here we need to call worker for each controller
-      results.append([worker_id, jobidx, fitness, timesteps])
+      #fitness, timesteps = worker(weights, seed, train_mode, max_len) ## Here we need to call worker for each controller
+      fitness, timesteps = worker(CONTROLLER_DICT, seed, train_mode, max_len) ## Here we need to call worker for each controller
+      results.append([worker_id, jobidx, fitness, timesteps]) # Result packets are the same for all agents because rewards are shared
     result_packet = encode_result_packet(results)
     assert len(result_packet) == RESULT_PACKET_SIZE
     comm.Send(result_packet, dest=0)
 
 def send_packets_to_slaves(packet_list):
   num_worker = comm.Get_size()
-  assert len(packet_list) == num_worker-1
+  assert len(packet_list) == num_worker-1 # Checks to see if there is 1 packet to be sent to each slave process
   for i in range(1, num_worker):
     packet = packet_list[i-1]
-    assert(len(packet) == SOLUTION_PACKET_SIZE)
+    # assert(len(packet) == SOLUTION_PACKET_SIZE) # TODO: put this back
     comm.Send(packet, dest=i)
 
 def receive_packets_from_slaves():
+  """
+  recieve packets from all slave processes
+  """
   result_packet = np.empty(RESULT_PACKET_SIZE, dtype=np.int32)
 
   reward_list_total = np.zeros((population, 2))
@@ -387,13 +414,12 @@ def master():
 
   seeder = Seeder(seed_start)
 
-  # # We have 3 controllers so may need to create 3 sets of files
   # filename = filebase+'.json'
-  # filename_log = filebase+'.log.json'
-  # filename_hist = filebase+'.hist.json'
-  # filename_eval_hist = filebase+'.eval_hist.json'
-  # filename_hist_best = filebase+'.hist_best.json'
-  # filename_best = filebase+'.best.json'
+  # filename_log = filebase+'.log.json'           # Stores every set of evaluation parameters of the controller
+  filename_hist = filebase+'.hist.json'           # Single file for storing all history during training, does not store controller-specific data
+  filename_eval_hist = filebase+'.eval_hist.json' # Single file for storing history of all evaluations, does not store controller-specific data
+  filename_hist_best = filebase+'.hist_best.json' # Single file for storing history of best evaluations, does not store controller-specific data
+  # filename_best = filebase+'.best.json'         # Stores best params for the controller
   
   t = 0  # "Generation (for all optimizers)"
 
@@ -411,111 +437,113 @@ def master():
     # for es, controller in zip(ES_LIST, CONTROLLER_LIST):
     # ask/tell interface is one way of running the optimizer
     # ask returns new candidate solutions, sampled from a multi-variate normal distribution and transformed to f-representation (phenotype) to be evaluated.	 
-    for e, ctrl in zip(ES_LIST, CONTROLLER_LIST):
+    #for e, ctrl in zip(ES_LIST, CONTROLLER_LIST):
       
+    # es = e
+    # controller = ctrl
+    
+    # print("[DEBUGGING] Generation: {} Controller: {}".format(t, controller.ID))
+  
+    solutions_dict = {}
+    for e, ctrl in zip(ES_LIST, CONTROLLER_LIST): 
       es = e
-      controller = ctrl
-      
-      print("[DEBUGGING] Generation: {} Controller: {}".format(t, controller.ID))
-    
-      # We have 3 controllers so may need to create 3 sets of files
-      filename = filebase+'_'+controller.ID+'.json'
-      filename_log = filebase+'_'+controller.ID+'.log.json'
-      filename_hist = filebase+'_'+controller.ID+'.hist.json'
-      filename_eval_hist = filebase+'_'+controller.ID+'.eval_hist.json'
-      filename_hist_best = filebase+'_'+controller.ID+'.hist_best.json'
-      filename_best = filebase+'_'+controller.ID+'.best.json'
-    
-      solutions = es.ask()  # solutions for this controller/optimizer pair
+      #solutions = es.ask()  # solutions for this controller/optimizer pair
+      solutions=es.ask()
 
       if antithetic:
         seeds = seeder.next_batch(int(es.popsize/2))
         seeds = seeds+seeds
       else:
         seeds = seeder.next_batch(es.popsize)
-      packet_list = encode_solution_packets(seeds, solutions, max_len=max_len)
-
-      send_packets_to_slaves(packet_list)
-      reward_list_total = receive_packets_from_slaves()
-
-      reward_list = reward_list_total[:, 0] # get rewards
-
-      mean_time_step = int(np.mean(reward_list_total[:, 1])*100)/100. # get average time step
-      max_time_step = int(np.max(reward_list_total[:, 1])*100)/100. # get average time step
-      avg_reward = int(np.mean(reward_list)*100)/100. # get average time step
-      std_reward = int(np.std(reward_list)*100)/100. # get average time step
       
-      # Tell updates the optimizer instance by passing respective function values
-      es.tell(reward_list)
+      solutions_dict[ctrl.ID] = (solutions, seeds)
 
-      es_solution = es.result() # Returns (xbest, f(xbest), evaluations_xbest, evaluations, iterations, pheno(xmean), effective_stds)
-      model_params = es_solution[0] # best historical solution
-      reward = es_solution[1] # best reward
-      curr_reward = es_solution[2] # best of the current batch
-      controller.set_model_params(np.array(model_params).round(4))
+    #packet_list = encode_solution_packets(seeds, solutions, max_len=max_len)
+    packet_list = encode_solution_packets(solutions_dict, max_len=max_len)
 
-      r_max = int(np.max(reward_list)*100)/100. 
-      r_min = int(np.min(reward_list)*100)/100.
+    send_packets_to_slaves(packet_list)
+    print("[DEBUGGING] Sent packets to slave processes...")
+    reward_list_total = receive_packets_from_slaves()
+    print("[DEBUGGING] Received packets from slave processes...")
 
-      curr_time = int(time.time()) - start_time
+    reward_list = reward_list_total[:, 0] # get rewards
 
-      h = (t, curr_time, avg_reward, r_min, r_max, std_reward, int(es.rms_stdev()*100000)/100000., mean_time_step+1., int(max_time_step)+1)
+    mean_time_step = int(np.mean(reward_list_total[:, 1])*100)/100. # get average time step
+    max_time_step = int(np.max(reward_list_total[:, 1])*100)/100. # get average time step
+    avg_reward = int(np.mean(reward_list)*100)/100. # get average time step
+    std_reward = int(np.std(reward_list)*100)/100. # get average time step
+    
+    # Tell updates the optimizer instance by passing respective function values
+    es.tell(reward_list)
 
-      if cap_time_mode:
-        max_len = 2*int(mean_time_step+1.0)
+    es_solution = es.result() # Returns (xbest, f(xbest), evaluations_xbest, evaluations, iterations, pheno(xmean), effective_stds)
+    model_params = es_solution[0] # best historical solution
+    reward = es_solution[1] # best reward
+    curr_reward = es_solution[2] # best of the current batch
+    controller.set_model_params(np.array(model_params).round(4))
+
+    r_max = int(np.max(reward_list)*100)/100. 
+    r_min = int(np.min(reward_list)*100)/100.
+
+    curr_time = int(time.time()) - start_time
+
+    h = (t, curr_time, avg_reward, r_min, r_max, std_reward, int(es.rms_stdev()*100000)/100000., mean_time_step+1., int(max_time_step)+1)
+
+    if cap_time_mode:
+      max_len = 2*int(mean_time_step+1.0)
+    else:
+      max_len = -1
+
+    history.append(h)
+
+    with open(filename, 'wt') as out:
+      res = json.dump([np.array(es.current_param()).round(4).tolist()], out, sort_keys=True, indent=2, separators=(',', ': '))
+
+    with open(filename_hist, 'wt') as out:
+      res = json.dump(history, out, sort_keys=False, indent=0, separators=(',', ':'))
+
+    # sprint(env_name, h)
+    print("[INFO] env_name: {}, h: {}".format(env_name, h))
+    
+    if (t == 1):
+      best_reward_eval = avg_reward
+    if (t % eval_steps == 0): # evaluate on actual task at hand
+
+      prev_best_reward_eval = best_reward_eval
+      model_params_quantized = np.array(es.current_param()).round(4)  # TODO: need to udpate this to be params for all controllers
+      reward_eval_list = evaluate_batch(model_params_quantized, max_len=-1, test_seed=t)  # TODO: need to update this function to support multiple controllers
+      reward_eval = np.mean(reward_eval_list)
+      r_eval_std = np.std(reward_eval_list)
+      r_eval_min = np.min(reward_eval_list)
+      r_eval_max = np.max(reward_eval_list)
+      model_params_quantized = model_params_quantized.tolist()
+      improvement = reward_eval - best_reward_eval
+      eval_log.append([t, reward_eval, model_params_quantized])
+      e_h = (t, reward_eval, r_eval_std, r_eval_min, r_eval_max)
+      eval_hist.append(e_h)
+      with open(filename_eval_hist, 'wt') as out:
+        res = json.dump(eval_hist, out, sort_keys=False, indent=0, separators=(',', ':'))
+      with open(filename_log, 'wt') as out:
+        res = json.dump(eval_log, out)
+      if (len(eval_log) == 1 or reward_eval > best_reward_eval):
+        # New reward is the best we've seen so far so store this value 
+        best_reward_eval = reward_eval 
+        # Store the params used to generate the best reward 
+        best_model_params_eval = model_params_quantized
       else:
-        max_len = -1
+        if retrain_mode:
+          sprint("reset to previous best params, where best_reward_eval =", best_reward_eval)
+          es.set_mu(best_model_params_eval) # Only implemented for OpenES and PEPG, does not do anything for CMAES
+      with open(filename_best, 'wt') as out:
+        res = json.dump([best_model_params_eval, best_reward_eval], out, sort_keys=True, indent=0, separators=(',', ': '))
+      # dump history of best
+      curr_time = int(time.time()) - start_time
+      best_record = [t, curr_time, "improvement", improvement, "curr", reward_eval, "prev", prev_best_reward_eval, "best", best_reward_eval]
+      history_best.append(best_record)
+      with open(filename_hist_best, 'wt') as out:
+        res = json.dump(history_best, out, sort_keys=False, indent=0, separators=(',', ':'))
 
-      history.append(h)
-
-      with open(filename, 'wt') as out:
-        res = json.dump([np.array(es.current_param()).round(4).tolist()], out, sort_keys=True, indent=2, separators=(',', ': '))
-
-      with open(filename_hist, 'wt') as out:
-        res = json.dump(history, out, sort_keys=False, indent=0, separators=(',', ':'))
-
-      # sprint(env_name, h)
-      print("[INFO] env_name: {}, h: {}".format(env_name, h))
-      
-      if (t == 1):
-        best_reward_eval = avg_reward
-      if (t % eval_steps == 0): # evaluate on actual task at hand
-
-        prev_best_reward_eval = best_reward_eval
-        model_params_quantized = np.array(es.current_param()).round(4)
-        reward_eval_list = evaluate_batch(model_params_quantized, max_len=-1, test_seed=t)
-        reward_eval = np.mean(reward_eval_list)
-        r_eval_std = np.std(reward_eval_list)
-        r_eval_min = np.min(reward_eval_list)
-        r_eval_max = np.max(reward_eval_list)
-        model_params_quantized = model_params_quantized.tolist()
-        improvement = reward_eval - best_reward_eval
-        eval_log.append([t, reward_eval, model_params_quantized])
-        e_h = (t, reward_eval, r_eval_std, r_eval_min, r_eval_max)
-        eval_hist.append(e_h)
-        with open(filename_eval_hist, 'wt') as out:
-          res = json.dump(eval_hist, out, sort_keys=False, indent=0, separators=(',', ':'))
-        with open(filename_log, 'wt') as out:
-          res = json.dump(eval_log, out)
-        if (len(eval_log) == 1 or reward_eval > best_reward_eval):
-          # New reward is the best we've seen so far so store this value 
-          best_reward_eval = reward_eval 
-          # Store the params used to generate the best reward 
-          best_model_params_eval = model_params_quantized
-        else:
-          if retrain_mode:
-            sprint("reset to previous best params, where best_reward_eval =", best_reward_eval)
-            es.set_mu(best_model_params_eval) # Only implemented for OpenES and PEPG, does not do anything for CMAES
-        with open(filename_best, 'wt') as out:
-          res = json.dump([best_model_params_eval, best_reward_eval], out, sort_keys=True, indent=0, separators=(',', ': '))
-        # dump history of best
-        curr_time = int(time.time()) - start_time
-        best_record = [t, curr_time, "improvement", improvement, "curr", reward_eval, "prev", prev_best_reward_eval, "best", best_reward_eval]
-        history_best.append(best_record)
-        with open(filename_hist_best, 'wt') as out:
-          res = json.dump(history_best, out, sort_keys=False, indent=0, separators=(',', ':'))
-
-        sprint("Eval", t, curr_time, "improvement", improvement, "curr", reward_eval, "prev", prev_best_reward_eval, "best", best_reward_eval)
+      sprint("Eval", t, curr_time, "improvement", improvement, "curr", reward_eval, "prev", prev_best_reward_eval, "best", best_reward_eval)
 
 
     # increment generation once all controllers have completed the optimization loop
