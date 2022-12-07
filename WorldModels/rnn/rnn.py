@@ -16,7 +16,7 @@ MODE_ZH = 4
 def sample_vae(vae_mu, vae_logvar):
     sz = vae_mu.shape[1]
     mu_logvar = tf.concat([vae_mu, vae_logvar], axis=1)
-    z = tfp.layers.DistributionLambda(lambda theta: tfp.distributions.MultivariateNormalDiag(loc=theta[:, :sz], scale_diag=tf.exp(theta[:, sz:])), dtype=tf.float16)
+    z = tfp.layers.DistributionLambda(lambda theta: tfp.distributions.MultivariateNormalDiag(loc=theta[:, :sz], scale_diag=tf.exp(theta[:, sz:])), dtype=tf.float32)
     return z(mu_logvar)
 
 class MDNRNN(tf.keras.Model):
@@ -36,11 +36,11 @@ class MDNRNN(tf.keras.Model):
             tf.keras.layers.Dense(args.rnn_out_size, name="mu_logstd_logmix_net")])
 
         super(MDNRNN, self).build((self.args.rnn_batch_size, self.args.rnn_max_seq_len, self.args.rnn_input_seq_width))
-
+        
     def get_loss(self):
         num_mixture = self.args.rnn_num_mixture
         batch_size = self.args.rnn_batch_size
-        z_size = self.args.z_size
+        z_size = self.args.z_size + 3 # + num_agents
         
         """Construct a loss functions for the MDN layer parametrised by number of mixtures."""
         # Construct a loss function with the right number of mixtures and outputs
@@ -101,7 +101,7 @@ class MDNRNN(tf.keras.Model):
         return self.__call__(inputs, training)
 
     def __call__(self, inputs, training=True):
-        rnn_out, _, _ = self.inference_base(inputs)
+        rnn_out, _, _ = self.inference_base(inputs, training=training)
 
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
         out = self.out_net(rnn_out)
