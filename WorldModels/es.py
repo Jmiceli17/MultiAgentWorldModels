@@ -97,6 +97,11 @@ class CMAES:
     self.solutions = None
 
     import cma
+    # self.es = cma.CMAEvolutionStrategy( np.zeros((self.num_params,)),
+    #                                     self.sigma_init,
+    #                                     {'popsize': self.popsize,
+    #                                     })
+    # Unsure why multiplying by [0]                                        
     self.es = cma.CMAEvolutionStrategy( self.num_params * [0],
                                         self.sigma_init,
                                         {'popsize': self.popsize,

@@ -67,8 +67,8 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
     print("[DEBUGGING] RNN defined!")
     if load_model:
       # self.vae.set_weights(tf.keras.models.load_model('results/{}/{}/tf_vae'.format(args.exp_name, args.env_name), compile=False).get_weights()) # No VAE
-      self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights()) 
-
+      # self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights()) 
+      self.rnn.load_weights('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name)) 
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 

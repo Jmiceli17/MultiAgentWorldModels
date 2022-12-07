@@ -16,9 +16,9 @@ MODE_Z = 2
 MODE_Z_HIDDEN = 3 # extra hidden later
 MODE_ZH = 4       ## This will probably be what's used for multiwalker
 
-def make_controller(args):
+def make_controller(args, id=None):
   # can be extended in the future.
-  controller = Controller(args)
+  controller = Controller(args, id)
   return controller
 
 def clip(x, lo=0.0, hi=1.0):
@@ -27,16 +27,18 @@ def clip(x, lo=0.0, hi=1.0):
 class Controller:
   ''' simple one layer model for car racing '''
   ## TODO: does anything in here need to change for multiwalker?
-  def __init__(self, args):
+  def __init__(self, args, id):
     self.env_name = args.env_name
     self.exp_mode = args.exp_mode
     self.input_size = args.z_size + args.state_space * args.rnn_size
     self.z_size = args.z_size
     self.a_width = args.a_width
     self.args = args
+    self.ID = id
 
     if self.exp_mode == MODE_Z_HIDDEN: # one hidden layer
-      self.hidden_size = 40
+      print("[INFO] Creating a controller with a hidden layer")
+      self.hidden_size = 40 # TODO: config?
       self.weight_hidden = np.random.randn(self.input_size, self.hidden_size)
       self.bias_hidden = np.random.randn(self.hidden_size)
       self.weight_output = np.random.randn(self.hidden_size, self.a_width)
