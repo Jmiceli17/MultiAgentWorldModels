@@ -26,8 +26,11 @@ args = PARSER.parse_args()
 
 DATA_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)
 model_save_path = "results/{}/{}/tf_rnn".format(args.exp_name, args.env_name)
+model_save_path2 = "results/{}/{}/tf_rnn_weights".format(args.exp_name, args.env_name)
 if not os.path.exists(model_save_path):
   os.makedirs(model_save_path)
+if not os.path.exists(model_save_path2):
+  os.makedirs(model_save_path2)
 
 raw_data = np.load(os.path.join(DATA_DIR, "series.npz"))
 
@@ -95,6 +98,7 @@ for step in range(args.rnn_num_steps):
   rnn.optimizer.learning_rate = curr_learning_rate
   
   raw_z, raw_a, raw_d = random_batch()
+  print(raw_z.shape, raw_a.shape, raw_d.shape)
 
   inputs = tf.concat([raw_z, raw_a], axis=2)
   if step == 0: # thank you original paper
@@ -115,7 +119,7 @@ for step in range(args.rnn_num_steps):
   loss = rnn.train_on_batch(x=inputs, y=outputs)
 
   ## Every 20 steps
-  if (step%20==0 and step > 0):
+  if (step%1==0 and step > 0):
     end = time.time()
     time_taken = end-start
     start = time.time()
@@ -132,3 +136,4 @@ for step in range(args.rnn_num_steps):
 
     print("Saved? ",rnn.save_spec() is not None)
     tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
+    rnn.save_weights(model_save_path2, save_format='tf')
