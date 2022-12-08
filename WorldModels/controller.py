@@ -147,7 +147,9 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
     t_list.append(step)
   return reward_list, t_list
 
-def simulate_multiple_controllers(controller_dict, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
+def simulate_multiple_controllers(controller_list, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
+# def simulate_multiple_controllers(controller_dict, env, train_mode=False, render_mode=False, num_episode=5, seed=-1, max_len=-1):
+
   """
   Function for simulating multiple controllers in a multi-agent environment, initially only intended to support the multiwalker env
   """
@@ -158,17 +160,17 @@ def simulate_multiple_controllers(controller_dict, env, train_mode=False, render
   t_list = []
   # Use the first controller to get the max ep length (note that each controller should have the same arguments)
   # TODO: make sure the key to this dictionary isn't hardcoded
-  max_episode_length = controller_dict[0].args.max_frames # should be equal to env.max_cycles
+  max_episode_length = controller_list[0].args.max_frames # should be equal to env.max_cycles
 
   # Override max_episode length if we're using this simulation for training
   if train_mode and max_len > 0:
     max_episode_length = max_len
 
-  # Seed the environment #TODO: need to verify this is correct for multiwalker
-  if (seed >= 0):
-    random.seed(seed)
-    np.random.seed(seed)
-    env.seed(seed)    
+  # # Seed the environment #TODO: need to fix seeding
+  # if (seed >= 0):
+  #   random.seed(seed)
+  #   np.random.seed(seed)
+  #   env.seed(seed)    
 
   # Run num_episode # of simulations
   for episode in range(num_episode):
@@ -177,19 +179,30 @@ def simulate_multiple_controllers(controller_dict, env, train_mode=False, render
       print('episode: {}/{}'.format(episode, num_episode))
 
     # Initialize the environment
-    env.reset()
+    # if (seed >= 0):
+    #   random.seed(seed)
+    #   np.random.seed(seed)
+    #   env.reset(seed)
+    # else:
+    #   env.reset()
+    env.reset() # TODO: need to fix seeding
     total_reward = 0.0
     
     for step in range(max_episode_length):
 
-      controller_id = 0
+      controller_idx = 0
 
       # There's multiple agents in this environment so each of them must apply an action
       for agent in env.agent_iter():
+        print()
         # Get an observation for this agent
         obs, totalRewardFromStep, done, truncation, info = env.last()
-        # Sample a random action for this agent
-        action = None if done or truncation else controller_dict[controller_id].get_action(obs) # TODO: need to figure out to access individual controllers
+        
+        # TODO: THERE IS A PROBLEM HERE!!!!!!!
+        # The action shouldn't be generated with an observation,
+        # Instead, we should use the observation to generate a concatenated observation/prediction for next state
+        action = None if done or truncation else controller_list[controller_idx].get_action(obs) # TODO: need to figure out to access individual controllers
+        
         # Apply the action for this agent
         env.step(action)
 
@@ -197,7 +210,7 @@ def simulate_multiple_controllers(controller_dict, env, train_mode=False, render
         # Update the total reward, each agent should be getting the same reward so it's ok to update it during each agent's actions
         total_reward = totalRewardFromStep
 
-        controller_id += 1
+        controller_idx += 1
 
       # If the env is terminated, start the next simulation, this value is the the same for all agents
       if done:

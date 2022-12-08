@@ -62,13 +62,14 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
   def __init__(self, args, env, load_model=False, full_episode=False):
     super(MultiwalkerMDNRNN, self).__init__(env, full_episode=full_episode)
     # self.vae = CVAE(args) # No VAE
-    print("[DEBUGGING] Defining RNN...")
+    # print("[DEBUGGING] Defining RNN...")
     self.rnn = MDNRNN(args)
-    print("[DEBUGGING] RNN defined!")
+    # print("[DEBUGGING] RNN defined!")
     if load_model:
       # self.vae.set_weights(tf.keras.models.load_model('results/{}/{}/tf_vae'.format(args.exp_name, args.env_name), compile=False).get_weights()) # No VAE
       # self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights()) 
-      self.rnn.load_weights('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name)) 
+      self.rnn.load_weights('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name))
+      print("[DEBUGGING] RNN model loaded!") 
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 

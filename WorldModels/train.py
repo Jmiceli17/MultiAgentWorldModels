@@ -25,16 +25,11 @@ from es import CMAES, SimpleGA, OpenES, PEPG
 from utils import PARSER
 import argparse
 import time
-# import struct
-# from typing import NamedTuple
 
 ### MPI related code
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 ###
-
-# class PacketStruct(NamedTuple):
-#   seeds: int
 
 
 def initialize_settings(sigma_init=0.1, sigma_decay=0.9999):
