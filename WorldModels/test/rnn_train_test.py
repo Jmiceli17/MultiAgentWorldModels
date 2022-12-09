@@ -24,10 +24,15 @@ from rnn.rnn import MDNRNN
 from utils import PARSER
 
 args = PARSER.parse_args()
-rnn=MDNRNN(args=args)
+# model = tf.keras.models.load_model('../results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name),compile=False)#custom_objects={"z_loss_func": z_loss_func}
 
+rnn=MDNRNN(args=args)
+# rnn.set_weights(model.get_weights())  # set_weights doesn't work cant not load the model this way because keras.models.load_model will load the configuration that has been defined, not something has been self_customed
 rnn.load_weights('../results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name))    # set_weights doesn't work cant not load the model this way because keras.models.load_model will load the configuration that has been defined, not something has been self_customed
 rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the model for training
+
+
+
 print("[INFO] Model Summary")
 rnn.summary()
 

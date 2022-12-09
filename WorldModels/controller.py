@@ -26,7 +26,6 @@ def clip(x, lo=0.0, hi=1.0):
 
 class Controller:
   ''' simple one layer model for car racing '''
-  ## TODO: does anything in here need to change for multiwalker?
   def __init__(self, args, id):
     self.env_name = args.env_name
     self.exp_mode = args.exp_mode
@@ -161,6 +160,7 @@ def simulate_multiple_controllers(controller_list, env, train_mode=False, render
   # Use the first controller to get the max ep length (note that each controller should have the same arguments)
   # TODO: make sure the key to this dictionary isn't hardcoded
   max_episode_length = controller_list[0].args.max_frames # should be equal to env.max_cycles
+  # max_episode_length = 75 # should be equal to env.max_cycles # TODO maek this an argument
 
   # Override max_episode length if we're using this simulation for training
   if train_mode and max_len > 0:
@@ -185,38 +185,43 @@ def simulate_multiple_controllers(controller_list, env, train_mode=False, render
     #   env.reset(seed)
     # else:
     #   env.reset()
-    env.reset() # TODO: need to fix seeding
-    total_reward = 0.0
+    z_h = env.reset() # TODO: need to fix seeding
     
     for step in range(max_episode_length):
-
-      controller_idx = 0
-
+      
       # There's multiple agents in this environment so each of them must apply an action
       for agent in env.agent_iter():
-        print()
-        # Get an observation for this agent
-        obs, totalRewardFromStep, done, truncation, info = env.last()
+        # print("agent str: {}".format(agent))
         
+        if agent == "walker_0":
+          controller_idx = 0
+        elif agent == "walker_1":
+          controller_idx = 1
+        elif agent == "walker_2":
+          controller_idx = 2
+
+        # Get an observation for this agent
+        # obs, totalRewardFromStep, done, truncation, info = env.last()
+        z_h, totalRewardFromStep, done, truncation, info =  env.last()
+
         # TODO: THERE IS A PROBLEM HERE!!!!!!!
         # The action shouldn't be generated with an observation,
         # Instead, we should use the observation to generate a concatenated observation/prediction for next state
-        action = None if done or truncation else controller_list[controller_idx].get_action(obs) # TODO: need to figure out to access individual controllers
+        action = None if done or truncation else controller_list[controller_idx].get_action(z_h) # TODO: need to figure out to access individual controllers
         
         # Apply the action for this agent
         env.step(action)
-
+        
         # TODO: verify multiwalker env supples the total reward up to that point!!!!!!!!!!!!!!!
         # Update the total reward, each agent should be getting the same reward so it's ok to update it during each agent's actions
         total_reward = totalRewardFromStep
 
-        controller_idx += 1
+        if done:
+          # This sim is done, move on to the next one
+          break
 
-      # If the env is terminated, start the next simulation, this value is the the same for all agents
-      if done:
-        break
-
-    # Store the total reward and the number of steps taken during this simulation  
+    # After we've reached max number of steps,
+    # store the total reward and the number of steps taken during this simulation  
     reward_list.append(total_reward)
     t_list.append(step)
 
