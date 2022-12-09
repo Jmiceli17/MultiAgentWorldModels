@@ -12,7 +12,6 @@ import time
 
 num_eps = 10000
 save_eps = 1000
-num_agents = 3
 
 from rnn.rnn import MDNRNN, sample_vae
 from utils import PARSER
@@ -23,10 +22,11 @@ np.set_printoptions(precision=4, edgeitems=6, linewidth=100, suppress=True)
 tf.config.experimental_run_functions_eagerly # used for debugging
 
 args = PARSER.parse_args()
+num_agents = args.num_agents
 
-DATA_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)
-model_save_path = "results/{}/{}/tf_rnn".format(args.exp_name, args.env_name)
-model_save_path2 = "results/{}/{}/tf_rnn_weights".format(args.exp_name, args.env_name)
+DATA_DIR = "results/{}/{}/seriess".format(args.exp_name, args.env_name)
+model_save_path = "results/{}/{}/tf_rnns".format(args.exp_name, args.env_name)
+model_save_path2 = "results/{}/{}/tf_rnn_weightss".format(args.exp_name, args.env_name)
 if not os.path.exists(model_save_path):
   os.makedirs(model_save_path)
 if not os.path.exists(model_save_path2):
@@ -93,6 +93,7 @@ rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the mode
 # train loop:
 start = time.time()
 step = 0              ## Number of steps to take in the env
+losses = []
 for step in range(args.rnn_num_steps):
   curr_learning_rate = (args.rnn_learning_rate-args.rnn_min_learning_rate) * (args.rnn_decay_rate) ** step + args.rnn_min_learning_rate
   rnn.optimizer.learning_rate = curr_learning_rate
@@ -117,9 +118,9 @@ for step in range(args.rnn_num_steps):
     outputs = z_targ
 
   loss = rnn.train_on_batch(x=inputs, y=outputs)
-
+  losses.append(loss)
   ## Every 20 steps
-  if (step%1==0 and step > 0):
+  if (step%100==0 and step > 0):
     end = time.time()
     time_taken = end-start
     start = time.time()
@@ -137,3 +138,4 @@ for step in range(args.rnn_num_steps):
     print("Saved? ",rnn.save_spec() is not None)
     tf.keras.models.save_model(rnn, model_save_path, include_optimizer=True, save_format='tf')
     rnn.save_weights(model_save_path2, save_format='tf')
+    np.savetxt("loss.txt",losses)

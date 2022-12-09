@@ -29,14 +29,15 @@ args = PARSER.parse_args()
 print("[INFO] Environment Name: {}".format(args.env_name))
 
 # Create log directory
-dir_name = 'results/{}/{}/record'.format(args.exp_name, args.env_name)
+dir_name = 'results/{}/{}/records'.format(args.exp_name, args.env_name)
 if not os.path.exists(dir_name):
     os.makedirs(dir_name)
 
 # Make the env
 # TODO: create env using config file
-# Note that the rnn model not loaded because it's not trained yet    
-env = make_env(args=args, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  
+# Note that the rnn model not loaded because it's not trained yet 
+   
+env = make_env(args=args, n_walkers=args.num_agents, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  
 
 for trial in range(args.max_trials):
     if (trial % 10) == 0:

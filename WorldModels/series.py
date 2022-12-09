@@ -11,12 +11,12 @@ for gpu in gpu_devices:
     tf.config.experimental.set_memory_growth(gpu, True)
 
 args = PARSER.parse_args()
-DATA_DIR = "results/{}/{}/record".format(args.exp_name, args.env_name)
-SERIES_DIR = "results/{}/{}/series".format(args.exp_name, args.env_name)    ## This is the data that is used to train the RNN, in the original paper, it containes data processed by the VAE
+DATA_DIR = "results/{}/{}/records".format(args.exp_name, args.env_name)
+SERIES_DIR = "results/{}/{}/seriess".format(args.exp_name, args.env_name)    ## This is the data that is used to train the RNN, in the original paper, it containes data processed by the VAE
 # model_path_name = "results/{}/{}/tf_vae".format(args.exp_name, args.env_name)
-num_eps = 150#10000#   #TODO: what is this for? Should it come from config? - would rather not. Was experimenting on it.
+num_eps = 10000#150#   #TODO: what is this for? Should it come from config? - would rather not. Was experimenting on it.
 
-num_agents = 3
+num_agents = args.num_agents
 indices = tf.range(num_agents)
 one_hot_encoding = np.array(tf.one_hot(indices, num_agents))
 
@@ -43,7 +43,7 @@ def ds_gen():
         action = np.reshape(data['action'], newshape=[-1, args.a_width])
         reward = data['reward']
         done = data['done']
-        if done.shape[0] > (num_agents*args.max_frames + num_agents): #TODO: Shouldn't this be always false
+        if done.shape[0] > (num_agents*args.max_frames + num_agents):
             i+=1
             continue
         #   print(fname, z.shape,action.shape, reward.shape, done.shape)
