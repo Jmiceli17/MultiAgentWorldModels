@@ -85,7 +85,7 @@ def random_batch():
       z[j::num_agents,k,:num_agents] = (z[j::num_agents,k,:num_agents]!=0.).astype(int)
   action = data_action[indices,:args.rnn_max_seq_len,:]
   d = tf.cast(data_d[indices], tf.float32)[:,:args.rnn_max_seq_len]
-  return z, action, d
+  return z, action, d 
 
 rnn = MDNRNN(args=args)
 rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the model for training
@@ -99,7 +99,6 @@ for step in range(args.rnn_num_steps):
   rnn.optimizer.learning_rate = curr_learning_rate
   
   raw_z, raw_a, raw_d = random_batch()
-  print(raw_z.shape, raw_a.shape, raw_d.shape)
 
   inputs = tf.concat([raw_z, raw_a], axis=2)
   if step == 0: # thank you original paper
@@ -116,11 +115,11 @@ for step in range(args.rnn_num_steps):
     outputs = [z_targ, d_targ]
   else:
     outputs = z_targ
-
+  print(inputs.shape, outputs.shape, raw_z.shape, raw_a.shape, raw_d.shape)
   loss = rnn.train_on_batch(x=inputs, y=outputs)
   losses.append(loss)
   ## Every 20 steps
-  if (step%100==0 and step > 0):
+  if ((step+1)%100==0 and step > 0):
     end = time.time()
     time_taken = end-start
     start = time.time()

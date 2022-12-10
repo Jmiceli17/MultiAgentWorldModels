@@ -26,7 +26,7 @@ from utils import PARSER
 args = PARSER.parse_args()
 
 ################################################################### Option 1 - seems to work
-model = tf.keras.models.load_model('../results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name),compile=False)#custom_objects={"z_loss_func": z_loss_func}
+model = tf.keras.models.load_model('../results/{}/{}/tf_rnns'.format(args.exp_name, args.env_name),compile=False)#custom_objects={"z_loss_func": z_loss_func}
 # model.summary()
 rnn=MDNRNN(args=args)
 rnn.set_weights(model.get_weights())    # set_weights doesn't work cant not load the model this way because keras.models.load_model will load the configuration that has been defined, not something has been self_customed

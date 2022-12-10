@@ -12,6 +12,8 @@ MODE_Z = 2
 MODE_Z_HIDDEN = 3 # extra hidden later
 MODE_ZH = 4
 
+num_agents = 1
+
 @tf.function
 def sample_vae(vae_mu, vae_logvar):
     sz = vae_mu.shape[1]
@@ -40,7 +42,7 @@ class MDNRNN(tf.keras.Model):
     def get_loss(self):
         num_mixture = self.args.rnn_num_mixture
         batch_size = self.args.rnn_batch_size
-        z_size = self.args.z_size + 3 # + num_agents
+        z_size = self.args.z_size + num_agents
         
         """Construct a loss functions for the MDN layer parametrised by number of mixtures."""
         # Construct a loss function with the right number of mixtures and outputs
@@ -61,6 +63,7 @@ class MDNRNN(tf.keras.Model):
             out_logpi = out_logpi - tf.reduce_logsumexp(input_tensor=out_logpi, axis=1, keepdims=True) # normalize
 
             logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
+            print("shape",vae_z.shape, out_mu.shape, out_logstd.shape)
             lognormal = -0.5 * ((vae_z - out_mu) / tf.exp(out_logstd)) ** 2 - out_logstd - logSqrtTwoPI
             v = out_logpi + lognormal
             
