@@ -107,7 +107,9 @@ class CMAES:
     #                                     {'popsize': self.popsize,
     #                                     })
     self.es = cma.CMAEvolutionStrategy( self.num_params * [0],
-                                        self.sigma_init)                                        
+                                        self.sigma_init,
+                                        {'popsize': self.popsize,
+                                        })                                        
 
   def rms_stdev(self):
     sigma = self.es.result[6]

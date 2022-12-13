@@ -168,7 +168,7 @@ def evaluate_batch(ctrl_list, test_env, test_seed=-1, num_test_episode=10, max_l
 
 def initialize_settings(args):   
     global FILEBASE, CONTROLLER_LIST, ES_LIST
-    population = 8 # not currently used (see es.py) # population = num_worker * num_worker_trial 
+    population = 8 # population = num_worker * num_worker_trial 
     sigma_init = args.controller_sigma_init
     sigma_decay = args.controller_sigma_decay
     exp_name = args.exp_name
@@ -287,6 +287,7 @@ def main(args):
     # batch_mode = args.controller_batch_mode
     # config_args = args
 
+    # Define global variables and initialize the optimizer
     initialize_settings(args)
 
     # (master)
@@ -327,7 +328,7 @@ def main(args):
     # Conduct the training loop
     # For either 100 generations or until the first optimizer is done TODO: probably a better way to set this
     print("[INFO] Starting optimization loop...")
-    while (gen < 100) and (not ES_LIST[0].stop()):
+    while (gen < 50) and (not ES_LIST[0].stop()):
         # Store the list of solutions (for each controller) from optimizer in a dictionary
         # solutions_dict = {}  # keys are controllers that map to a list of solutions from the optimizer
         solutions_list = []  # indices correspond to controllers
