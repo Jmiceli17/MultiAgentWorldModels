@@ -87,12 +87,12 @@ class CMAES:
   '''CMA-ES wrapper.'''
   def __init__(self, num_params,      # number of model parameters
                sigma_init=0.10,       # initial standard deviation
-               popsize=255,           # population size
+               popsize=255,           # population size, number of candidate solutions returned by ask ()
                weight_decay=0.01):    # weight decay coefficient
 
     self.num_params = num_params
     self.sigma_init = sigma_init
-    self.popsize = popsize
+    self.popsize = popsize          
     self.weight_decay = weight_decay
     self.solutions = None
 
@@ -107,7 +107,9 @@ class CMAES:
     #                                     {'popsize': self.popsize,
     #                                     })
     self.es = cma.CMAEvolutionStrategy( self.num_params * [0],
-                                        self.sigma_init)                                        
+                                        self.sigma_init,
+                                        {'popsize': self.popsize,
+                                        })                                        
 
   def rms_stdev(self):
     sigma = self.es.result[6]
@@ -137,6 +139,10 @@ class CMAES:
   def result(self): # return best params so far, along with historically best reward, curr reward, sigma
     r = self.es.result
     return (r[0], -r[1], -r[1], r[6])
+  
+  def stop(self):
+    return self.es.stop()
+
 
 class SimpleGA:
   '''Simple Genetic Algorithm.'''

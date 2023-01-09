@@ -32,6 +32,9 @@ model = tf.keras.models.load_model('../results/{}/{}/tf_rnn'.format(args.exp_nam
 rnn=MDNRNN(args=args)
 rnn.set_weights(model.get_weights())    # set_weights doesn't work cant not load the model this way because keras.models.load_model will load the configuration that has been defined, not something has been self_customed
 rnn.compile(optimizer=rnn.optimizer, loss=rnn.get_loss()) ## Configures the model for training
+
+
+
 print("[INFO] Model Summary")
 rnn.summary()
 print(rnn.get_weights())

@@ -41,17 +41,24 @@ import numpy as np
 
 def main(args):
 
-    # TODO: load controllers
-    # controller_0 = make_controller(...)
-    # controller_1 = make_controller(...)
-    # controller_2 = make_controller(...)
-    # controller_list = [controller_0, controller_1, controller_2]
+    # Create controllers and populate the weights that were optimized in trainMultiwalker.py
+    # WARNING! Make sure you're loading the correct files here!
+    controller_0 = make_controller(args, id="ctrl_0")
+    controller_0.load_model('results/{}/{}/log/{}.cma.20.8.{}.best.json'.format(args.exp_name, args.env_name, args.env_name, controller_0.ID))
+    
+    controller_1 = make_controller(args, id="ctrl_1")
+    controller_1.load_model('results/{}/{}/log/{}.cma.20.8.{}.best.json'.format(args.exp_name, args.env_name, args.env_name, controller_1.ID))
+    
+    controller_2 = make_controller(args, id="ctrl_2")
+    controller_2.load_model('results/{}/{}/log/{}.cma.20.8.{}.best.json'.format(args.exp_name, args.env_name, args.env_name, controller_2.ID))
+    
+    controller_list = [controller_0, controller_1, controller_2]
 
     # Make the environment to be evaluated
     env_eval = make_env(args=args, dream_env=False, render_mode=False)
 
     # Define number of simulations to use for evaluations
-    num_episodes = 1000
+    num_episodes = 100  # TODO: could make this a separate config parameter from args
 
     # Run the simulations and collect the total number of rewards and steps from each simulation
     print("[INFO] Evaluating controllers...")

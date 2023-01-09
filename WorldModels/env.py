@@ -18,11 +18,17 @@ class MultiWalkerWrapper(gym.Wrapper):
       super(MultiWalkerWrapper, self).__init__(env)
       self.env = env
 
-    def _last(self):
+    def last(self):
+
       observation, reward, terminated, truncation, info = self.env.last()
-      return observation, reward, terminated, truncation, info
+      z = observation # For multiwalker, z is just the pure observation
+      h = tf.squeeze(self.rnn_states[0])
+      z_h = tf.concat([z, h], axis=-1)
+
+      return z_h, reward, terminated, truncation, info
     
     def _step(self, action):
+      print("[DEBUGGING] Env _step called")
       # Applies the action for the walker/agent that is currently selected    
       self.env.step(action)
       # Get observation, cumulative reward, terminated, truncated, info for the current walker/agent (specified by agent_selection)
@@ -32,7 +38,6 @@ class MultiWalkerWrapper(gym.Wrapper):
       return observation, reward, terminated, {}
 
     def _reset(self):
-      # print("[DEBUGGING] Env reset called")
       self.env.reset()
 
 class CarRacingWrapper(CarRacing):
@@ -74,7 +79,7 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
     
     self.full_episode = False 
 
-    print("[DEBUGGING] MultiWalkerWrapper initialized!")
+    # print("[DEBUGGING] MultiWalkerWrapper initialized!")
 
   def reset(self):
     self.rnn_states = rnn_init_state(self.rnn)
@@ -83,20 +88,22 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
 
     # TODO: observations are only updated at the end of a cycle so we may need to change the update of the RNN until all the agents have 
     # been called
-    observation, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self)._last()
-    z = observation # For multiwalker, z is just the pure observation
-    h = tf.squeeze(self.rnn_states[0])
-    z_h = tf.concat([z, h], axis=-1)
+    # z_h, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self)._last()
+    z_h, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self).last() # TODO: this may cause problems during RNN training - I think it expects an obs only not z_h but optimizing the controllers requires z_h output
+    # z = observation # For multiwalker, z is just the pure observation
+    # print("[DEBUGGING] shape of z in reset: {}".format(np.shape(z)))
+    # h = tf.squeeze(self.rnn_states[0])
+    # z_h = tf.concat([z, h], axis=-1)
     return z_h
 
   def _step(self, action):
-    super(MultiwalkerMDNRNN, self).step(action)
+    # super(MultiwalkerMDNRNN, self).step(action)
     # Get observation, cumulative reward, terminated, truncated, info for the current agent (specified by agent_selection)
     observation, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self).last()
     z = observation # For multiwalker, z is just the pure observation
     h = tf.squeeze(self.rnn_states[0])
     z_h = tf.concat([z, h], axis=-1)
-
+        
     # TODO: how do we handle multiple agents here? For each agent, there should be a separate input
     if action is not None: # don't compute state on reset
         self.rnn_states = rnn_next_state(self.rnn, z, action, self.rnn_states)
