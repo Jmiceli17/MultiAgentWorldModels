@@ -18,7 +18,17 @@ class MultiWalkerWrapper(gym.Wrapper):
       super(MultiWalkerWrapper, self).__init__(env)
       self.env = env
 
+    def last(self):
+
+      observation, reward, terminated, truncation, info = self.env.last()
+      z = observation # For multiwalker, z is just the pure observation
+      h = tf.squeeze(self.rnn_states[0])
+      z_h = tf.concat([z, h], axis=-1)
+
+      return z_h, reward, terminated, truncation, info
+    
     def _step(self, action):
+      print("[DEBUGGING] Env _step called")
       # Applies the action for the walker/agent that is currently selected    
       self.env.step(action)
       # Get observation, cumulative reward, terminated, truncated, info for the current walker/agent (specified by agent_selection)
@@ -27,6 +37,8 @@ class MultiWalkerWrapper(gym.Wrapper):
         return observation, reward, False, {}
       return observation, reward, terminated, {}
 
+    def _reset(self):
+      self.env.reset()
 
 class CarRacingWrapper(CarRacing):
   def __init__(self, full_episode=False):
@@ -55,34 +67,44 @@ class MultiwalkerMDNRNN(MultiWalkerWrapper):
   def __init__(self, args, env, load_model=False, full_episode=False):
     super(MultiwalkerMDNRNN, self).__init__(env, full_episode=full_episode)
     # self.vae = CVAE(args) # No VAE
-    print("[DEBUGGING] Defining RNN...")
+    # print("[DEBUGGING] Defining RNN...")
     self.rnn = MDNRNN(args)
-    print("[DEBUGGING] RNN defined!")
+    # print("[DEBUGGING] RNN defined!")
     if load_model:
       # self.vae.set_weights(tf.keras.models.load_model('results/{}/{}/tf_vae'.format(args.exp_name, args.env_name), compile=False).get_weights()) # No VAE
-      self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights())
-
+      # self.rnn.set_weights(tf.keras.models.load_model('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name), compile=False).get_weights()) 
+      self.rnn.load_weights('results/{}/{}/tf_rnn'.format(args.exp_name, args.env_name))
+      print("[DEBUGGING] RNN model loaded!") 
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 
 
-    print("[DEBUGGING] MultiWalkerWrapper initialized!")
+    # print("[DEBUGGING] MultiWalkerWrapper initialized!")
 
   def reset(self):
     self.rnn_states = rnn_init_state(self.rnn)
-    # TODO: do we need to call super(...).last() in order to populate z_h with an observation?
-    z_h = super(MultiwalkerMDNRNN, self).reset(return_info=True) # calls step, this just returns None
+    # super(MultiwalkerMDNRNN, self).reset(return_info=True) # calls step, this just returns None
+    super(MultiwalkerMDNRNN, self)._reset()
+
+    # TODO: observations are only updated at the end of a cycle so we may need to change the update of the RNN until all the agents have 
+    # been called
+    # z_h, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self)._last()
+    z_h, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self).last() # TODO: this may cause problems during RNN training - I think it expects an obs only not z_h but optimizing the controllers requires z_h output
+    # z = observation # For multiwalker, z is just the pure observation
+    # print("[DEBUGGING] shape of z in reset: {}".format(np.shape(z)))
+    # h = tf.squeeze(self.rnn_states[0])
+    # z_h = tf.concat([z, h], axis=-1)
     return z_h
 
   def _step(self, action):
-    super(MultiwalkerMDNRNN, self).step(action)
+    # super(MultiwalkerMDNRNN, self).step(action)
     # Get observation, cumulative reward, terminated, truncated, info for the current agent (specified by agent_selection)
     observation, reward, terminated, truncation, info = super(MultiwalkerMDNRNN, self).last()
     z = observation # For multiwalker, z is just the pure observation
     h = tf.squeeze(self.rnn_states[0])
     z_h = tf.concat([z, h], axis=-1)
-
-    # TODO: how do we handle multiple agents here?
+        
+    # TODO: how do we handle multiple agents here? For each agent, there should be a separate input
     if action is not None: # don't compute state on reset
         self.rnn_states = rnn_next_state(self.rnn, z, action, self.rnn_states)
     
@@ -108,7 +130,7 @@ class CarRacingMDNRNN(CarRacingWrapper):
     self.rnn_states = rnn_init_state(self.rnn)
     
     self.full_episode = False 
-    self.observation_space = Box(low=np.NINF, high=np.Inf, shape=(32+256))
+    self.observation_space = Box(low=np.NINF, high=np.Inf, shape=(32+256,))
 
   def encode_obs(self, obs):
     # convert raw obs to z, mu, logvar
@@ -121,7 +143,7 @@ class CarRacingMDNRNN(CarRacingWrapper):
   def reset(self):
     self.rnn_states = rnn_init_state(self.rnn)
     if self.with_obs:
-        [z_h, obs] = super(CarRacingMDNRNN, self).reset() # calls step
+        [z_h, obs] = super(CarRacingMDNRNN, self).reset() # calls step in CarRacing-v0 gym env
         return [z_h, obs]
     else:
         z_h = super(CarRacingMDNRNN, self).reset() # calls step
@@ -145,7 +167,9 @@ class CarRacingMDNRNN(CarRacingWrapper):
     tf.keras.backend.clear_session()
     gc.collect()
 
+
 """
+
 from ppaquette_gym_doom.doom_take_cover import DoomTakeCoverEnv
 from gym.utils import seeding
 class DoomTakeCoverMDNRNN(DoomTakeCoverEnv):
@@ -322,7 +346,7 @@ class DreamDoomTakeCoverMDNRNN:
 
   def render(self, mode):
     pass
-"""
+# """
 
 def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=False, with_obs=False, load_model=True):
   if args.env_name == 'DoomTakeCover-v0':
@@ -332,12 +356,14 @@ def make_env(args, dream_env=False, seed=-1, render_mode=False, full_episode=Fal
     else:
       print('making real doom environment')
       # env = DoomTakeCoverMDNRNN(args=args, render_mode=render_mode, load_model=load_model, with_obs=with_obs)
+  
   elif args.env_name == 'multiwalker_v9':
     print('making multiwalker environment')
     # TODO: make init configurable
     env = multiwalker_v9.env(n_walkers=3, position_noise=1e-3, angle_noise=1e-3, forward_reward=1.0, terminate_reward=-100.0, fall_reward=-10.0, shared_reward=True,
-terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames)
+terminate_on_fall=True, remove_on_fall=True, terrain_length=75, max_cycles=args.max_frames) 
     env = MultiwalkerMDNRNN(args=args, env=env, full_episode=full_episode, load_model=load_model)
+  
   else:
     if dream_env:
       raise ValueError('training in dreams for carracing is not yet supported')

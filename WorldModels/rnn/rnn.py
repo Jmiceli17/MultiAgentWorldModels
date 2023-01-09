@@ -16,7 +16,7 @@ MODE_ZH = 4
 def sample_vae(vae_mu, vae_logvar):
     sz = vae_mu.shape[1]
     mu_logvar = tf.concat([vae_mu, vae_logvar], axis=1)
-    z = tfp.layers.DistributionLambda(lambda theta: tfp.distributions.MultivariateNormalDiag(loc=theta[:, :sz], scale_diag=tf.exp(theta[:, sz:])), dtype=tf.float16)
+    z = tfp.layers.DistributionLambda(lambda theta: tfp.distributions.MultivariateNormalDiag(loc=theta[:, :sz], scale_diag=tf.exp(theta[:, sz:])), dtype=tf.float32)
     return z(mu_logvar)
 
 class MDNRNN(tf.keras.Model):
@@ -36,11 +36,11 @@ class MDNRNN(tf.keras.Model):
             tf.keras.layers.Dense(args.rnn_out_size, name="mu_logstd_logmix_net")])
 
         super(MDNRNN, self).build((self.args.rnn_batch_size, self.args.rnn_max_seq_len, self.args.rnn_input_seq_width))
-
+        
     def get_loss(self):
         num_mixture = self.args.rnn_num_mixture
         batch_size = self.args.rnn_batch_size
-        z_size = self.args.z_size
+        z_size = self.args.z_size + 3 # + num_agents
         
         """Construct a loss functions for the MDN layer parametrised by number of mixtures."""
         # Construct a loss function with the right number of mixtures and outputs
@@ -101,15 +101,17 @@ class MDNRNN(tf.keras.Model):
         return self.__call__(inputs, training)
 
     def __call__(self, inputs, training=True):
-        rnn_out, _, _ = self.inference_base(inputs)
+        rnn_out, _, _ = self.inference_base(inputs, training=training)
 
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
         out = self.out_net(rnn_out)
-        if self.args.env_name == 'CarRacing-v0':
-          return out
-        else: 
+
+        if self.args.env_name == 'DoomTakeCover-v0':
           mdnrnn_params, done_logits = out[:, :-1], out[:, -1:]
           return mdnrnn_params, done_logits
+        else: 
+          return out
+          
 
 @tf.function
 def rnn_next_state(rnn, z, a, prev_state):
@@ -125,11 +127,11 @@ def rnn_init_state(rnn):
 
 def rnn_output(state, z, mode):
   state_h, state_c = state[0], state[1]
-  if mode == MODE_ZCH:
+  if mode == MODE_ZCH: #0
     return np.concatenate([z, np.concatenate((state_c,state_h), axis=1)[0]])
-  if mode == MODE_ZC:
+  if mode == MODE_ZC: #1
     return np.concatenate([z, state_c[0]])
-  if mode == MODE_ZH:
+  if mode == MODE_ZH: #4
     return np.concatenate([z, state_h[0]])
   return z # MODE_Z or MODE_Z_HIDDEN
 
@@ -137,6 +139,8 @@ def rnn_output(state, z, mode):
 def rnn_sim(rnn, z, states, a):
   if rnn.args.env_name == 'CarRacing-v0':
     raise ValueError('Not implemented yet for CarRacing')
+  elif rnn.args.env_name == 'multiwalker_v9':
+    raise ValueError('Not implemented yet for MultiWalker')
   z = tf.reshape(tf.cast(z, dtype=tf.float32), (1, 1, rnn.args.z_size))
   a = tf.reshape(tf.cast(a, dtype=tf.float32), (1, 1, rnn.args.a_width))
   input_x = tf.concat((z, a), axis=2)

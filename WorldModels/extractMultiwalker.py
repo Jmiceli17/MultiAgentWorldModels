@@ -3,7 +3,7 @@ extractMultiwalker.py
 
 Author:
     Joe Miceli
-    Mohammed Adib
+    Mohammed Adib Oumer
 
 Description:
 
@@ -13,7 +13,7 @@ Description:
     see https://numpy.org/doc/stable/reference/generated/numpy.savez.html 
 
     use the following:
-    python extractMultiwalker.py -c /configs/multiwalker.config
+    python extractMultiwalker.py -c ./configs/multiwalker.config
 """
 
 import numpy as np
@@ -39,6 +39,8 @@ if not os.path.exists(dir_name):
 env = make_env(args=args, render_mode=args.render_mode, full_episode=args.full_episode, with_obs=True, load_model=False)  
 
 for trial in range(args.max_trials):
+    if (trial % 10) == 0:
+        print("[INFO] Trial: {}".format(trial))
     try:
         random_generated_int = random.randint(0, 2**31-1)
         filename = dir_name+"/"+str(random_generated_int)+".npz"
@@ -55,8 +57,10 @@ for trial in range(args.max_trials):
 
         previousReward = 0.0
 
-        # for i in range(args.max_cycles):
-        for i in range(50):
+        # max_frames same as max_cycles in multiwalker environment
+        for cycle in range(args.max_frames):
+        ######## TODO: make this configurable
+        #for i in range(50):
 
             # There's multiple agents in this environment so each of them must apply an action
             for agent in env.agent_iter():
@@ -89,17 +93,24 @@ for trial in range(args.max_trials):
             # print("[DEBUGGING] recording_action: {}".format(recording_action))
             # print("[DEBUGGING] recording_reward: {}".format(recording_reward))
             # print("[DEBUGGING] recording_done: {}".format(recording_done))
-
+            
+            # If the env is terminated, start the next simulation, should be the same for all agents
             if done:
                 print('[INFO] total reward {}'.format(totalReward))
                 break
+
+        # Every cycle of every trial/simulation, the observations/actions/rewards/done get concatenated together so
+        # here, recording_obs contains the observations for each agent for this cycle stacked on top of each other
+        # recording_action contains the actions for each agent for this cycle stacked on top of each other, etc.
+        # the resulting dimensions at the end of each trial will be something like 
+        # [number of cycles peformed x len(obs)], [number of cycles peformed x len(action)], etc.
         recording_agent = np.array(recording_agent, dtype=str) 
         recording_obs = np.array(recording_obs, dtype=np.float16)
         recording_action = np.array(recording_action, dtype=np.float16)
         recording_reward = np.array(recording_reward, dtype=np.float16)
-        recording_done = np.array(recording_done, dtype=np.bool)
+        recording_done = np.array(recording_done, dtype=np.bool_)
 
-        # save the arrays in a compressed file, arrays are accessbile via keyword arguments
+        # save the arrays in a compressed file at the end of each rollout, arrays are accessbile via keyword arguments
         # TODO: change filename to be more descriptive
         np.savez_compressed(filename, agent= recording_agent, obs=recording_obs, action=recording_action, reward=recording_reward, done=recording_done)   
 
