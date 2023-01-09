@@ -119,7 +119,7 @@ for step in range(args.rnn_num_steps):
   loss = rnn.train_on_batch(x=inputs, y=outputs)
 
   ## Every 20 steps
-  if (step%1==0 and step > 0):
+  if (step%20==0 and step > 0):
     end = time.time()
     time_taken = end-start
     start = time.time()
